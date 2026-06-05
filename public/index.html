@@ -1,0 +1,487 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>BUZZER</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d0d0f;
+    --surface: #18181c;
+    --accent: #f0e040;
+    --text: #f5f5f0;
+    --muted: #555560;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Nunito', sans-serif;
+    overflow: hidden;
+    touch-action: manipulation;
+  }
+
+  /* ── SCREENS ── */
+  .screen { display: none; height: 100%; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+  .screen.active { display: flex; }
+
+  /* ── JOIN SCREEN ── */
+  #joinScreen {
+    gap: 28px;
+    background: var(--bg);
+  }
+
+  .logo {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: clamp(52px, 16vw, 88px);
+    letter-spacing: -2px;
+    color: var(--accent);
+    text-shadow: 4px 4px 0 #8a7e00, 8px 8px 0 #3d3800;
+    line-height: 1;
+  }
+
+  .tagline {
+    font-size: 13px;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .input-wrap {
+    width: 100%;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    padding: 16px 20px;
+    background: var(--surface);
+    border: 2px solid #2a2a30;
+    border-radius: 14px;
+    color: var(--text);
+    font-family: 'Nunito', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    outline: none;
+    transition: border-color 0.2s;
+    text-align: center;
+  }
+  input[type="text"]::placeholder { color: var(--muted); }
+  input[type="text"]:focus { border-color: var(--accent); }
+
+  .btn-join {
+    width: 100%;
+    padding: 18px;
+    background: var(--accent);
+    color: #0d0d0f;
+    border: none;
+    border-radius: 14px;
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 22px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: transform 0.1s, box-shadow 0.1s;
+    box-shadow: 0 6px 0 #8a7e00;
+  }
+  .btn-join:active { transform: translateY(4px); box-shadow: 0 2px 0 #8a7e00; }
+
+  .players-preview {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    justify-content: center;
+    max-width: 340px;
+  }
+  .player-chip {
+    padding: 6px 14px;
+    border-radius: 99px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #111;
+    animation: popIn 0.3s cubic-bezier(.34,1.56,.64,1);
+  }
+  @keyframes popIn {
+    from { transform: scale(0); opacity: 0; }
+    to   { transform: scale(1); opacity: 1; }
+  }
+
+  /* ── BUZZER SCREEN ── */
+  #buzzerScreen {
+    gap: 0;
+    padding: 0;
+    background: var(--bg);
+    position: relative;
+  }
+
+  .player-name-top {
+    position: absolute;
+    top: 24px;
+    font-size: 15px;
+    font-weight: 900;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  .buzz-btn {
+    width: min(72vw, 320px);
+    height: min(72vw, 320px);
+    border-radius: 50%;
+    border: none;
+    cursor: pointer;
+    position: relative;
+    transition: transform 0.08s;
+    -webkit-tap-highlight-color: transparent;
+    outline: none;
+    background: var(--player-color, #FF6B6B);
+    box-shadow:
+      0 0 0 12px color-mix(in srgb, var(--player-color, #FF6B6B) 25%, transparent),
+      0 12px 0 0 color-mix(in srgb, var(--player-color, #FF6B6B) 50%, #000),
+      0 16px 40px color-mix(in srgb, var(--player-color, #FF6B6B) 40%, transparent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .buzz-btn::after {
+    content: '¡BUZZ!';
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: clamp(32px, 10vw, 52px);
+    color: rgba(0,0,0,0.55);
+    letter-spacing: 2px;
+  }
+  .buzz-btn:active:not(:disabled) {
+    transform: scale(0.93) translateY(6px);
+    box-shadow:
+      0 0 0 12px color-mix(in srgb, var(--player-color, #FF6B6B) 25%, transparent),
+      0 4px 0 0 color-mix(in srgb, var(--player-color, #FF6B6B) 50%, #000),
+      0 6px 20px color-mix(in srgb, var(--player-color, #FF6B6B) 40%, transparent);
+  }
+  .buzz-btn:disabled {
+    opacity: 0.35;
+    cursor: not-allowed;
+    transform: none;
+  }
+
+  .waiting-text {
+    position: absolute;
+    bottom: 40px;
+    font-size: 13px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+
+  /* ── WINNER OVERLAY ── */
+  #winnerOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    z-index: 100;
+    padding: 24px;
+    animation: overlayIn 0.4s cubic-bezier(.34,1.2,.64,1);
+  }
+  #winnerOverlay.show { display: flex; }
+
+  @keyframes overlayIn {
+    from { transform: scale(0.7); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+
+  .winner-label {
+    font-size: 14px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: rgba(0,0,0,0.5);
+    font-weight: 900;
+  }
+
+  .winner-name {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: clamp(48px, 18vw, 96px);
+    color: #0d0d0f;
+    text-align: center;
+    line-height: 1;
+    text-shadow: 3px 3px 0 rgba(0,0,0,0.2);
+  }
+
+  .trophy {
+    font-size: 64px;
+    animation: bounce 0.6s ease infinite alternate;
+  }
+  @keyframes bounce {
+    from { transform: translateY(0); }
+    to   { transform: translateY(-12px); }
+  }
+
+  .btn-reset {
+    margin-top: 12px;
+    padding: 16px 40px;
+    background: rgba(0,0,0,0.2);
+    color: rgba(0,0,0,0.6);
+    border: 3px solid rgba(0,0,0,0.2);
+    border-radius: 14px;
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 18px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .btn-reset:hover { background: rgba(0,0,0,0.3); }
+
+  /* ── REVEAL PANEL ── */
+  .btn-reveal {
+    margin-top: 4px;
+    padding: 14px 36px;
+    background: rgba(0,0,0,0.15);
+    color: rgba(0,0,0,0.7);
+    border: 3px solid rgba(0,0,0,0.2);
+    border-radius: 14px;
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 18px;
+    letter-spacing: 2px;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+  .btn-reveal:hover { background: rgba(0,0,0,0.25); }
+
+  .player-track-reveal {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+    background: rgba(0,0,0,0.15);
+    border-radius: 14px;
+    padding: 16px 24px;
+    width: 100%;
+    max-width: 280px;
+    animation: overlayIn 0.3s cubic-bezier(.34,1.3,.64,1);
+  }
+  .player-track-reveal.show { display: flex; }
+  .player-track-name {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: clamp(18px, 6vw, 32px);
+    color: #0d0d0f;
+    line-height: 1.1;
+  }
+  .player-track-artist {
+    font-size: 13px;
+    font-weight: 700;
+    color: rgba(0,0,0,0.45);
+    letter-spacing: 1px;
+  }
+
+  /* confetti particles */
+  .confetti-wrap {
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    z-index: 99;
+    overflow: hidden;
+  }
+  .confetti-piece {
+    position: absolute;
+    width: 10px;
+    height: 14px;
+    top: -20px;
+    animation: confettiFall linear forwards;
+    border-radius: 2px;
+  }
+  @keyframes confettiFall {
+    to { transform: translateY(110vh) rotate(720deg); opacity: 0; }
+  }
+
+  /* connection dot */
+  .conn-dot {
+    position: fixed;
+    top: 14px;
+    right: 16px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: #555;
+    transition: background 0.4s;
+  }
+  .conn-dot.on { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
+</style>
+</head>
+<body>
+
+<div class="conn-dot" id="connDot"></div>
+
+<!-- JOIN -->
+<div class="screen active" id="joinScreen">
+  <div class="logo">BUZZ!</div>
+  <div class="tagline">¿Quién pulsa primero?</div>
+  <div class="input-wrap">
+    <input type="text" id="nameInput" placeholder="Tu nombre" maxlength="20" autocomplete="off" spellcheck="false">
+    <button class="btn-join" id="joinBtn">UNIRSE</button>
+  </div>
+  <div class="players-preview" id="playersPreview"></div>
+</div>
+
+<!-- BUZZER -->
+<div class="screen" id="buzzerScreen">
+  <div class="player-name-top" id="playerNameTop"></div>
+  <button class="buzz-btn" id="buzzBtn"></button>
+  <div class="waiting-text">¡Pulsa cuando puedas!</div>
+</div>
+
+<!-- WINNER OVERLAY -->
+<div class="confetti-wrap" id="confettiWrap"></div>
+<div id="winnerOverlay">
+  <div class="trophy">🏆</div>
+  <div class="winner-label">¡PRIMERO!</div>
+  <div class="winner-name" id="winnerName"></div>
+  <div class="player-track-reveal" id="playerTrackReveal">
+    <div class="player-track-name" id="playerTrackName"></div>
+    <div class="player-track-artist" id="playerTrackArtist"></div>
+  </div>
+  <button class="btn-reveal" id="revealTrackBtn" style="display:none">👁 REVELAR</button>
+  <button class="btn-reset" id="resetBtn">NUEVA RONDA</button>
+</div>
+
+<script>
+  const joinScreen   = document.getElementById('joinScreen');
+  const buzzerScreen = document.getElementById('buzzerScreen');
+  const winnerOverlay= document.getElementById('winnerOverlay');
+  const confettiWrap = document.getElementById('confettiWrap');
+  const nameInput    = document.getElementById('nameInput');
+  const joinBtn      = document.getElementById('joinBtn');
+  const buzzBtn      = document.getElementById('buzzBtn');
+  const resetBtn     = document.getElementById('resetBtn');
+  const winnerName   = document.getElementById('winnerName');
+  const playerNameTop= document.getElementById('playerNameTop');
+  const playersPreview=document.getElementById('playersPreview');
+  const connDot      = document.getElementById('connDot');
+
+  let myId = null, myColor = null, ws = null;
+
+  const revealTrackBtn    = document.getElementById('revealTrackBtn');
+  const playerTrackReveal = document.getElementById('playerTrackReveal');
+  const playerTrackName   = document.getElementById('playerTrackName');
+  const playerTrackArtist = document.getElementById('playerTrackArtist');
+  let myCurrentTrack = null;
+
+  function connect() {
+    const proto = location.protocol === 'https:' ? 'wss' : 'ws';
+    ws = new WebSocket(`${proto}://${location.host}`);
+
+    ws.onopen = () => connDot.classList.add('on');
+    ws.onclose = () => { connDot.classList.remove('on'); setTimeout(connect, 2000); };
+
+    ws.onmessage = (e) => {
+      const msg = JSON.parse(e.data);
+
+      if (msg.type === 'full_reset') {
+        myId = null;
+        myColor = null;
+        myCurrentTrack = null;
+        buzzerScreen.classList.remove('active');
+        joinScreen.classList.add('active');
+        winnerOverlay.classList.remove('show');
+        confettiWrap.innerHTML = '';
+        buzzBtn.disabled = false;
+        playerTrackReveal.classList.remove('show');
+        revealTrackBtn.style.display = 'none';
+        playersPreview.innerHTML = '';
+      }
+
+      if (msg.type === 'joined') {
+        myId = msg.id;
+        myColor = msg.color;
+        buzzBtn.style.setProperty('--player-color', myColor);
+        joinScreen.classList.remove('active');
+        buzzerScreen.classList.add('active');
+      }
+
+      if (msg.type === 'state') {
+        myCurrentTrack = msg.currentTrack || null;
+
+        // players preview on join screen
+        playersPreview.innerHTML = '';
+        msg.players.forEach(p => {
+          const chip = document.createElement('div');
+          chip.className = 'player-chip';
+          chip.textContent = p.name;
+          chip.style.background = p.color;
+          playersPreview.appendChild(chip);
+        });
+
+        if (msg.locked && msg.winner) {
+          winnerName.textContent = msg.winner;
+          winnerOverlay.style.background = msg.winnerColor;
+          winnerOverlay.classList.add('show');
+          launchConfetti(msg.winnerColor);
+          buzzBtn.disabled = true;
+          const isWinner = msg.winnerId === myId;
+          resetBtn.style.display = isWinner ? 'block' : 'none';
+          revealTrackBtn.style.display = (isWinner && myCurrentTrack) ? 'block' : 'none';
+          playerTrackReveal.classList.remove('show');
+        } else {
+          winnerOverlay.classList.remove('show');
+          confettiWrap.innerHTML = '';
+          buzzBtn.disabled = false;
+          revealTrackBtn.style.display = 'none';
+          playerTrackReveal.classList.remove('show');
+        }
+      }
+    };
+  }
+
+  joinBtn.addEventListener('click', () => {
+    const name = nameInput.value.trim() || `Jugador`;
+    playerNameTop.textContent = name;
+    ws.send(JSON.stringify({ type: 'join', name }));
+  });
+
+  nameInput.addEventListener('keydown', e => { if (e.key === 'Enter') joinBtn.click(); });
+
+  buzzBtn.addEventListener('click', () => {
+    ws.send(JSON.stringify({ type: 'buzz' }));
+  });
+
+  resetBtn.addEventListener('click', () => {
+    ws.send(JSON.stringify({ type: 'reset' }));
+  });
+
+  revealTrackBtn.addEventListener('click', () => {
+    if (myCurrentTrack) {
+      playerTrackName.textContent   = myCurrentTrack.name;
+      playerTrackArtist.textContent = myCurrentTrack.artist || '';
+      playerTrackReveal.classList.add('show');
+      revealTrackBtn.style.display = 'none';
+      if (ws && ws.readyState === 1) ws.send(JSON.stringify({ type: 'reveal_track' }));
+    }
+  });
+
+  function launchConfetti(baseColor) {
+    confettiWrap.innerHTML = '';
+    const colors = [baseColor, '#fff', '#FFE66D', '#fff', '#f0f0f0'];
+    for (let i = 0; i < 80; i++) {
+      const p = document.createElement('div');
+      p.className = 'confetti-piece';
+      p.style.left = Math.random() * 100 + 'vw';
+      p.style.background = colors[Math.floor(Math.random() * colors.length)];
+      p.style.animationDuration = (1.5 + Math.random() * 2) + 's';
+      p.style.animationDelay = (Math.random() * 0.8) + 's';
+      p.style.transform = `rotate(${Math.random()*360}deg)`;
+      confettiWrap.appendChild(p);
+    }
+  }
+
+  connect();
+</script>
+</body>
+</html>
