@@ -173,9 +173,11 @@ app.get('/api/random-track', async (req, res) => {
 let gameState = {
   winner: null,
   winnerColor: null,
+  winnerId: null,
   locked: false,
   players: {},
   currentTrack: null,
+  buzzOrder: [],
 };
 
 const PLAYER_COLORS = [
@@ -198,6 +200,7 @@ function broadcastState() {
     locked:      gameState.locked,
     players:     Object.values(gameState.players).map(p => ({ id: p.id, name: p.name, color: p.color })),
     currentTrack: gameState.currentTrack,
+    buzzOrder:   gameState.buzzOrder,
   });
 }
 
@@ -217,19 +220,28 @@ wss.on('connection', (ws) => {
       broadcastState();
     }
 
-    if (msg.type === 'buzz' && playerId && !gameState.locked) {
+    if (msg.type === 'buzz' && playerId) {
       const player = gameState.players[playerId];
-      gameState.locked = true;
-      gameState.winner = player.name;
-      gameState.winnerId = player.id;
-      gameState.winnerColor = player.color;
-      broadcastState();
+      if (!player) return;
+      const alreadyBuzzed = gameState.buzzOrder.some(b => b.id === playerId);
+      if (!alreadyBuzzed) {
+        gameState.buzzOrder.push({ id: player.id, name: player.name, color: player.color });
+        if (!gameState.locked) {
+          gameState.locked = true;
+          gameState.winner = player.name;
+          gameState.winnerId = player.id;
+          gameState.winnerColor = player.color;
+        }
+        broadcastState();
+      }
     }
 
     if (msg.type === 'reset') {
       gameState.locked = false;
       gameState.winner = null;
+      gameState.winnerId = null;
       gameState.winnerColor = null;
+      gameState.buzzOrder = [];
       broadcast({ type: 'round_reset' });
       broadcastState();
     }
@@ -248,9 +260,28 @@ wss.on('connection', (ws) => {
       broadcast({ type: 'reveal_track' });
     }
 
+    // Keeps buzzOrder intact — only clears winner/locked (for replaying same track)
+    if (msg.type === 'partial_reset') {
+      gameState.locked = false;
+      gameState.winner = null;
+      gameState.winnerId = null;
+      gameState.winnerColor = null;
+      broadcastState();
+    }
+
+    // Clears everything including buzzOrder, but no round_reset (host-triggered new track)
+    if (msg.type === 'game_reset') {
+      gameState.locked = false;
+      gameState.winner = null;
+      gameState.winnerId = null;
+      gameState.winnerColor = null;
+      gameState.buzzOrder = [];
+      broadcastState();
+    }
+
     if (msg.type === 'full_reset') {
       broadcast({ type: 'full_reset' });
-      gameState = { winner: null, winnerId: null, winnerColor: null, locked: false, players: {}, currentTrack: null };
+      gameState = { winner: null, winnerId: null, winnerColor: null, locked: false, players: {}, currentTrack: null, buzzOrder: [] };
       colorIndex = 0;
       broadcastState();
     }

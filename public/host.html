@@ -271,7 +271,7 @@
   }
 
   /* Left column items */
-  #spotifyBox, #nowPlayingCard, #winnerBanner, .section-title, #playersGrid, #emptyState {
+  #spotifyBox, #nowPlayingCard, #winnerBanner, #buzzOrderList, .section-title, #playersGrid, #emptyState {
     grid-column: 1;
   }
 
@@ -812,6 +812,79 @@
   #nextBtn    { background: #2a2a2a; color: #fff; }
   #stopBtn    { background: #2a2a2a; color: #aaa; margin-left: auto; }
 
+  /* ── BUZZ ORDER LIST ── */
+  #buzzOrderList {
+    display: none;
+    grid-column: 1;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: -16px;
+    margin-bottom: 28px;
+    padding: 0 4px;
+    animation: cardIn 0.35s cubic-bezier(.34,1.4,.64,1);
+  }
+  #buzzOrderList.show { display: flex; }
+
+  .buzz-order-label {
+    font-size: 10px;
+    font-weight: 900;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 2px;
+  }
+
+  .buzz-order-chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .boc {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 8px 14px 8px 10px;
+    animation: cardIn 0.3s cubic-bezier(.34,1.4,.64,1) both;
+  }
+
+  .boc-rank {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 13px;
+    color: var(--muted);
+    min-width: 24px;
+  }
+
+  .boc-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  .boc-name {
+    font-weight: 900;
+    font-size: 14px;
+    color: var(--text);
+  }
+
+  /* Position badge on player cards */
+  .buzz-badge {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: 12px;
+    color: rgba(255,255,255,0.7);
+    background: rgba(0,0,0,0.4);
+    border-radius: 6px;
+    padding: 2px 7px;
+    letter-spacing: 1px;
+  }
+
   /* ── PULSE RING for winner card ── */
   @keyframes pulseRing {
     0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--player-color) 60%, transparent); }
@@ -921,6 +994,12 @@
     </div>
   </div>
 
+  <!-- Buzz Order List (positions #2, #3...) -->
+  <div id="buzzOrderList">
+    <div class="buzz-order-label">Orden de buzzers</div>
+    <div class="buzz-order-chips" id="buzzOrderChips"></div>
+  </div>
+
   <div class="section-title">Jugadores conectados</div>
 
   <div id="playersGrid"></div>
@@ -932,15 +1011,17 @@
 </main>
 
 <script>
-  const connDot      = document.getElementById('connDot');
-  const resetBtn     = document.getElementById('resetBtn');
-  const playersGrid  = document.getElementById('playersGrid');
-  const emptyState   = document.getElementById('emptyState');
-  const winnerBanner = document.getElementById('winnerBanner');
-  const winnerNameBig= document.getElementById('winnerNameBig');
-  const confettiWrap = document.getElementById('confettiWrap');
-  const countNum     = document.getElementById('countNum');
-  const joinUrl      = document.getElementById('joinUrl');
+  const connDot       = document.getElementById('connDot');
+  const resetBtn      = document.getElementById('resetBtn');
+  const playersGrid   = document.getElementById('playersGrid');
+  const emptyState    = document.getElementById('emptyState');
+  const winnerBanner  = document.getElementById('winnerBanner');
+  const winnerNameBig = document.getElementById('winnerNameBig');
+  const confettiWrap  = document.getElementById('confettiWrap');
+  const countNum      = document.getElementById('countNum');
+  const joinUrl       = document.getElementById('joinUrl');
+  const buzzOrderList = document.getElementById('buzzOrderList');
+  const buzzOrderChips= document.getElementById('buzzOrderChips');
 
   joinUrl.textContent = location.host;
 
@@ -1039,11 +1120,17 @@
       }
     });
 
-    // Apply winner/loser states
+    const buzzOrder = msg.buzzOrder || [];
+
+    // Apply winner/loser states + buzz position badges
     if (msg.locked && msg.winner) {
       players.forEach(p => {
         const card = document.getElementById('card-' + p.id);
         if (!card) return;
+        const buzzPos = buzzOrder.findIndex(b => b.id === p.id);
+        // Clear old badge
+        const oldBadge = card.querySelector('.buzz-badge');
+        if (oldBadge) oldBadge.remove();
         if (p.name === msg.winner) {
           card.classList.add('winner');
           card.classList.remove('loser');
@@ -1054,15 +1141,24 @@
             crown.textContent = '👑';
             card.appendChild(crown);
           }
-        } else {
+        } else if (buzzPos > 0) {
+          // Buzzed but not winner
           card.classList.add('loser');
           card.classList.remove('winner');
+          const crown = card.querySelector('.winner-crown');
+          if (crown) crown.remove();
+          const badge = document.createElement('div');
+          badge.className = 'buzz-badge';
+          badge.textContent = '#' + (buzzPos + 1);
+          card.appendChild(badge);
+        } else {
+          card.classList.remove('winner', 'loser');
           const crown = card.querySelector('.winner-crown');
           if (crown) crown.remove();
         }
       });
 
-      // Banner
+      // Winner Banner
       winnerNameBig.textContent = msg.winner;
       winnerBanner.style.background = msg.winnerColor;
       winnerBanner.classList.add('show');
@@ -1076,7 +1172,33 @@
         card.classList.remove('winner', 'loser');
         const crown = card.querySelector('.winner-crown');
         if (crown) crown.remove();
+        const badge = card.querySelector('.buzz-badge');
+        if (badge) badge.remove();
+        // Show buzz position badge even when unlocked (partial_reset keeps buzzOrder)
+        const buzzPos = buzzOrder.findIndex(b => b.id === p.id);
+        if (buzzPos >= 0) {
+          const badge2 = document.createElement('div');
+          badge2.className = 'buzz-badge';
+          badge2.textContent = '#' + (buzzPos + 1);
+          card.appendChild(badge2);
+          card.classList.add('loser');
+        }
       });
+    }
+
+    // Buzz order chips (#2, #3...) — show whenever there are entries
+    if (buzzOrder.length > 1) {
+      buzzOrderChips.innerHTML = buzzOrder.slice(1).map((b, i) => `
+        <div class="boc" style="animation-delay:${i * 0.06}s">
+          <span class="boc-rank">#${i + 2}</span>
+          <span class="boc-dot" style="background:${b.color}"></span>
+          <span class="boc-name">${escHtml(b.name)}</span>
+        </div>
+      `).join('');
+      buzzOrderList.classList.add('show');
+    } else {
+      buzzOrderList.classList.remove('show');
+      buzzOrderChips.innerHTML = '';
     }
 
     // Pre-load track data for when host clicks REVELAR (but don't show yet)
@@ -1197,10 +1319,12 @@
 
   settingsBtn.addEventListener('click', () => settingsModal.classList.add('show'));
   settingsModal.addEventListener('click', e => { if (e.target === settingsModal) settingsModal.classList.remove('show'); });
-  durationSlider.addEventListener('input', () => { durationDisplay.textContent = durationSlider.value; });
-  saveSettingsBtn.addEventListener('click', () => {
+  durationSlider.addEventListener('input', () => {
+    durationDisplay.textContent = durationSlider.value;
     playDuration = parseInt(durationSlider.value) * 1000;
     localStorage.setItem('buzzer_duration', playDuration);
+  });
+  saveSettingsBtn.addEventListener('click', () => {
     settingsModal.classList.remove('show');
   });
 
@@ -1347,55 +1471,124 @@
     clearInterval(progressTimer);
     trackReveal.classList.remove('show');
     trackCover.style.display = 'none';
+    // Reset game state (clears buzzOrder) for the new track
+    if (ws?.readyState === 1) ws.send(JSON.stringify({ type: 'game_reset' }));
     setMode('fetching');
 
     try {
-      // 1. Si cambió la playlist, establecer el contexto (play + pause inmediato)
-      if (playlistId !== currentPlaylistId) {
-        currentPlaylistId = playlistId;
-        await spFetch('https://api.spotify.com/v1/me/player/play?device_id=' + deviceId, {
+      // Desactivar shuffle siempre
+      await spFetch(`https://api.spotify.com/v1/me/player/shuffle?state=false&device_id=${deviceId}`, { method: 'PUT' }).catch(() => {});
+
+      const playlistChanged = playlistId !== currentPlaylistId;
+      currentPlaylistId = playlistId;
+
+      if (playlistChanged) {
+        // Primera vez con esta playlist: cargar contexto (brevemente audible) y pausar
+        const ctxRes = await spFetch('https://api.spotify.com/v1/me/player/play?device_id=' + deviceId, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ context_uri: 'spotify:playlist:' + playlistId, position_ms: 0 }),
+          body: JSON.stringify({ context_uri: 'spotify:playlist:' + playlistId }),
         });
+        if (!ctxRes.ok && ctxRes.status !== 204 && ctxRes.status !== 202) {
+          const b = await ctxRes.json().catch(() => ({}));
+          throw new Error(b?.error?.message || `Error ${ctxRes.status}`);
+        }
         await spFetch('https://api.spotify.com/v1/me/player/pause', { method: 'PUT' }).catch(() => {});
+        await new Promise(r => setTimeout(r, 400));
       }
 
-      // 2. Skip mientras está pausado (sin audio) → avanza al siguiente track
+      // Skip mientras está pausado. Spotify lo procesa async, así que verificamos
+      // que el track realmente cambió antes de reproducir (hasta 5 intentos × 200ms).
+      const uriBeforeSkip = currentTrackUri;
       await spFetch(`https://api.spotify.com/v1/me/player/next?device_id=${deviceId}`, { method: 'POST' }).catch(() => {});
 
-      // 3. Ahora sí reproducir el track aleatorio pre-seleccionado
-      const playRes = await spFetch('https://api.spotify.com/v1/me/player/play?device_id=' + deviceId, {
+      let skipConfirmed = false;
+      for (let i = 0; i < 5; i++) {
+        await new Promise(r => setTimeout(r, 200));
+        try {
+          const chk = await spFetch('https://api.spotify.com/v1/me/player/currently-playing');
+          if (chk.ok && chk.status !== 204) {
+            const chkD = await chk.json();
+            if (chkD?.item?.uri && chkD.item.uri !== uriBeforeSkip) { skipConfirmed = true; break; }
+          }
+        } catch (_) {}
+      }
+      // Si no podemos confirmar el skip, esperamos un poco más igual
+      if (!skipConfirmed) await new Promise(r => setTimeout(r, 200));
+
+      // Reproducir el track al que avanzamos desde el inicio
+      let playRes = await spFetch('https://api.spotify.com/v1/me/player/play?device_id=' + deviceId, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ position_ms: 0 }),
       });
-      if (!playRes.ok && playRes.status !== 204) throw new Error('Error ' + playRes.status);
+
+      // Si falla con 403 (contexto perdido), recargar contexto y reintentar una vez
+      if (playRes.status === 403) {
+        currentPlaylistId = null;
+        const ctxRes2 = await spFetch('https://api.spotify.com/v1/me/player/play?device_id=' + deviceId, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ context_uri: 'spotify:playlist:' + playlistId }),
+        });
+        if (!ctxRes2.ok && ctxRes2.status !== 204 && ctxRes2.status !== 202) {
+          const b = await ctxRes2.json().catch(() => ({}));
+          throw new Error(b?.error?.message || `Error ${ctxRes2.status}`);
+        }
+        await spFetch('https://api.spotify.com/v1/me/player/pause', { method: 'PUT' }).catch(() => {});
+        await new Promise(r => setTimeout(r, 400));
+        await spFetch(`https://api.spotify.com/v1/me/player/next?device_id=${deviceId}`, { method: 'POST' }).catch(() => {});
+        await new Promise(r => setTimeout(r, 500));
+        playRes = await spFetch('https://api.spotify.com/v1/me/player/play?device_id=' + deviceId, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ position_ms: 0 }),
+        });
+        currentPlaylistId = playlistId;
+      }
+
+      if (!playRes.ok && playRes.status !== 204) {
+        const body = await playRes.json().catch(() => ({}));
+        throw new Error(body?.error?.message || `Error ${playRes.status}`);
+      }
 
       setMode('playing');
       startProgressTimer(playDuration);
 
-      setTimeout(async () => {
-        try {
-          const r = await spFetch('https://api.spotify.com/v1/me/player/currently-playing');
-          if (r.ok && r.status !== 204) {
-            const d = await r.json();
-            const t = d?.item;
-            if (t) {
-              currentTrackUri         = t.uri;
-              trackName.textContent   = t.name;
-              trackArtist.textContent = (t.artists || []).map(a => a.name).join(', ');
-              const cover = t.album?.images?.[1]?.url || t.album?.images?.[0]?.url;
-              if (cover) { trackCover.src = cover; trackCover.style.display = 'block'; }
-              currentTrackData = { name: t.name, artist: trackArtist.textContent, cover: cover || null };
-              if (ws?.readyState === 1) ws.send(JSON.stringify({ type: 'play_track', track: { name: t.name, artist: trackArtist.textContent } }));
+      // Fetchear el track actual con reintentos: si Spotify devuelve el track anterior,
+      // espera y reintenta hasta 4 veces (el state puede tardar en actualizarse).
+      ;(async () => {
+        for (let attempt = 0; attempt < 4; attempt++) {
+          await new Promise(r => setTimeout(r, attempt === 0 ? 800 : 500));
+          try {
+            const r = await spFetch('https://api.spotify.com/v1/me/player/currently-playing');
+            if (r.ok && r.status !== 204) {
+              const d = await r.json();
+              const t = d?.item;
+              if (t && t.uri !== uriBeforeSkip) {
+                // Confirmado: este es el track nuevo
+                currentTrackUri         = t.uri;
+                trackName.textContent   = t.name;
+                trackArtist.textContent = (t.artists || []).map(a => a.name).join(', ');
+                const cover = t.album?.images?.[1]?.url || t.album?.images?.[0]?.url;
+                if (cover) { trackCover.src = cover; trackCover.style.display = 'block'; }
+                currentTrackData = { name: t.name, artist: trackArtist.textContent, cover: cover || null };
+                if (ws?.readyState === 1) ws.send(JSON.stringify({ type: 'play_track', track: { name: t.name, artist: trackArtist.textContent } }));
+                return; // éxito, salimos del loop
+              }
             }
-          }
-        } catch (_) {}
-      }, 1000);
+          } catch (_) {}
+        }
+      })();
 
     } catch (err) {
       console.error(err);
+      const isRestriction = err.message?.includes('Restriction violated') || err.message?.includes('UNKNOWN');
+      if (isRestriction) {
+        trackArtist.textContent = '⚠ Reproducí algo en Spotify primero para activar el dispositivo, luego intentá de nuevo.';
+        trackArtist.style.display = 'block';
+        spPlayingArea.classList.add('show');
+      }
       setMode('ready');
     }
   }
@@ -1427,6 +1620,8 @@
   replayBtn.addEventListener('click', async () => {
     if (!currentTrackUri) return;
     trackReveal.classList.remove('show');
+    // Partial reset: keep buzzOrder so already-buzzed players stay locked
+    if (ws?.readyState === 1) ws.send(JSON.stringify({ type: 'partial_reset' }));
     setMode('fetching');
     const playRes = await spFetch('https://api.spotify.com/v1/me/player/play?device_id=' + deviceId, {
       method: 'PUT',
@@ -1440,6 +1635,7 @@
 
   document.getElementById('deviceSelect').addEventListener('change', function() {
     deviceId = this.value;
+    currentPlaylistId = null; // Forzar recarga de contexto en el nuevo dispositivo
   });
 
   document.getElementById('deviceRefreshBtn').addEventListener('click', () => {

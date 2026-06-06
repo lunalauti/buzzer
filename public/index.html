@@ -302,6 +302,63 @@
     to { transform: translateY(110vh) rotate(720deg); opacity: 0; }
   }
 
+  /* ── POSITION OVERLAY (for non-winner buzzers) ── */
+  #positionOverlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    z-index: 100;
+    padding: 24px;
+    background: var(--bg);
+    animation: overlayIn 0.4s cubic-bezier(.34,1.2,.64,1);
+  }
+  #positionOverlay.show { display: flex; }
+
+  .pos-rank {
+    font-family: 'Black Han Sans', sans-serif;
+    font-size: clamp(88px, 32vw, 160px);
+    color: var(--pos-color, #888);
+    line-height: 1;
+    text-shadow: 4px 4px 0 rgba(0,0,0,0.35);
+  }
+
+  .pos-reached {
+    font-size: 12px;
+    letter-spacing: 5px;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 900;
+  }
+
+  .pos-winner-info {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--muted);
+    text-align: center;
+    max-width: 240px;
+    line-height: 1.5;
+  }
+
+  /* ── LOCKED INFO (shown on buzzer screen when someone else won) ── */
+  #lockedInfo {
+    position: absolute;
+    bottom: 40px;
+    left: 0;
+    right: 0;
+    text-align: center;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--muted);
+    letter-spacing: 2px;
+    padding: 0 24px;
+    transition: color 0.3s;
+  }
+  #lockedInfo.alert { color: var(--accent); }
+
   /* connection dot */
   .conn-dot {
     position: fixed;
@@ -335,7 +392,7 @@
 <div class="screen" id="buzzerScreen">
   <div class="player-name-top" id="playerNameTop"></div>
   <button class="buzz-btn" id="buzzBtn"></button>
-  <div class="waiting-text">¡Pulsa cuando puedas!</div>
+  <div id="lockedInfo">¡Pulsa cuando puedas!</div>
 </div>
 
 <!-- WINNER OVERLAY -->
@@ -349,22 +406,39 @@
     <div class="player-track-artist" id="playerTrackArtist"></div>
   </div>
   <button class="btn-reveal" id="revealTrackBtn" style="display:none">👁 REVELAR</button>
-  <button class="btn-reset" id="resetBtn">NUEVA RONDA</button>
+  <div style="display:flex;gap:12px;flex-wrap:wrap;justify-content:center;">
+    <button class="btn-reset" id="againBtn">DE NUEVO</button>
+    <button class="btn-reset" id="resetBtn" style="background:rgba(0,0,0,0.3);border-style:dashed;">SIGUIENTE ▶</button>
+  </div>
+</div>
+
+<!-- POSITION OVERLAY -->
+<div id="positionOverlay">
+  <div class="pos-reached">LLEGASTE</div>
+  <div class="pos-rank" id="posRankEl">#2</div>
+  <div class="pos-winner-info" id="posWinnerInfo"></div>
 </div>
 
 <script>
-  const joinScreen   = document.getElementById('joinScreen');
-  const buzzerScreen = document.getElementById('buzzerScreen');
-  const winnerOverlay= document.getElementById('winnerOverlay');
-  const confettiWrap = document.getElementById('confettiWrap');
-  const nameInput    = document.getElementById('nameInput');
-  const joinBtn      = document.getElementById('joinBtn');
-  const buzzBtn      = document.getElementById('buzzBtn');
-  const resetBtn     = document.getElementById('resetBtn');
-  const winnerName   = document.getElementById('winnerName');
-  const playerNameTop= document.getElementById('playerNameTop');
-  const playersPreview=document.getElementById('playersPreview');
-  const connDot      = document.getElementById('connDot');
+  const joinScreen    = document.getElementById('joinScreen');
+  const buzzerScreen  = document.getElementById('buzzerScreen');
+  const winnerOverlay = document.getElementById('winnerOverlay');
+  const confettiWrap  = document.getElementById('confettiWrap');
+  const nameInput     = document.getElementById('nameInput');
+  const joinBtn       = document.getElementById('joinBtn');
+  const buzzBtn       = document.getElementById('buzzBtn');
+  const resetBtn      = document.getElementById('resetBtn');
+  const againBtn      = document.getElementById('againBtn');
+  const winnerName    = document.getElementById('winnerName');
+  const playerNameTop = document.getElementById('playerNameTop');
+  const playersPreview= document.getElementById('playersPreview');
+  const connDot       = document.getElementById('connDot');
+  const lockedInfo    = document.getElementById('lockedInfo');
+
+  // Position overlay
+  const positionOverlay = document.getElementById('positionOverlay');
+  const posRankEl       = document.getElementById('posRankEl');
+  const posWinnerInfo   = document.getElementById('posWinnerInfo');
 
   let myId = null, myColor = null, ws = null;
 
@@ -391,23 +465,33 @@
         buzzerScreen.classList.remove('active');
         joinScreen.classList.add('active');
         winnerOverlay.classList.remove('show');
+        positionOverlay.classList.remove('show');
         confettiWrap.innerHTML = '';
         buzzBtn.disabled = false;
         playerTrackReveal.classList.remove('show');
         revealTrackBtn.style.display = 'none';
         playersPreview.innerHTML = '';
+        lockedInfo.textContent = '¡Pulsa cuando puedas!';
+        lockedInfo.classList.remove('alert');
       }
 
       if (msg.type === 'joined') {
         myId = msg.id;
         myColor = msg.color;
         buzzBtn.style.setProperty('--player-color', myColor);
+        positionOverlay.style.setProperty('--pos-color', myColor);
         joinScreen.classList.remove('active');
         buzzerScreen.classList.add('active');
       }
 
       if (msg.type === 'state') {
         myCurrentTrack = msg.currentTrack || null;
+
+        const buzzOrder  = msg.buzzOrder || [];
+        const hasBuzzed  = myId && buzzOrder.some(b => b.id === myId);
+        const myPosition = hasBuzzed ? buzzOrder.findIndex(b => b.id === myId) + 1 : null;
+        const isWinner   = !!msg.winner && msg.winnerId === myId;
+        const isLocked   = !!msg.locked && !!msg.winner;
 
         // players preview on join screen
         playersPreview.innerHTML = '';
@@ -419,22 +503,50 @@
           playersPreview.appendChild(chip);
         });
 
-        if (msg.locked && msg.winner) {
+        // Buzzer button: only disable if this specific player has already buzzed
+        buzzBtn.disabled = hasBuzzed;
+
+        if (isWinner) {
+          // ── WINNER ──
           winnerName.textContent = msg.winner;
           winnerOverlay.style.background = msg.winnerColor;
           winnerOverlay.classList.add('show');
+          positionOverlay.classList.remove('show');
           launchConfetti(msg.winnerColor);
-          buzzBtn.disabled = true;
-          const isWinner = msg.winnerId === myId;
-          resetBtn.style.display = isWinner ? 'block' : 'none';
-          revealTrackBtn.style.display = (isWinner && myCurrentTrack) ? 'block' : 'none';
+          revealTrackBtn.style.display = myCurrentTrack ? 'block' : 'none';
           playerTrackReveal.classList.remove('show');
-        } else {
+          lockedInfo.textContent = '¡Pulsa cuando puedas!';
+          lockedInfo.classList.remove('alert');
+        } else if (hasBuzzed) {
+          // ── BUZZED BUT NOT WINNER ──
           winnerOverlay.classList.remove('show');
           confettiWrap.innerHTML = '';
-          buzzBtn.disabled = false;
+          positionOverlay.classList.add('show');
+          posRankEl.textContent = '#' + myPosition;
+          if (isLocked) {
+            posWinnerInfo.textContent = '🏆 ' + msg.winner + ' fue el primero';
+            posWinnerInfo.style.display = 'block';
+          } else {
+            posWinnerInfo.style.display = 'none';
+          }
           revealTrackBtn.style.display = 'none';
           playerTrackReveal.classList.remove('show');
+          lockedInfo.textContent = '¡Pulsa cuando puedas!';
+          lockedInfo.classList.remove('alert');
+        } else {
+          // ── HASN'T BUZZED — keep buzzer active ──
+          winnerOverlay.classList.remove('show');
+          positionOverlay.classList.remove('show');
+          confettiWrap.innerHTML = '';
+          revealTrackBtn.style.display = 'none';
+          playerTrackReveal.classList.remove('show');
+          if (isLocked) {
+            lockedInfo.textContent = '🏆 ' + msg.winner + ' fue primero — ¡DALE!';
+            lockedInfo.classList.add('alert');
+          } else {
+            lockedInfo.textContent = '¡Pulsa cuando puedas!';
+            lockedInfo.classList.remove('alert');
+          }
         }
       }
     };
@@ -452,6 +564,12 @@
     ws.send(JSON.stringify({ type: 'buzz' }));
   });
 
+  // "DE NUEVO" — keeps buzz order, only non-buzzed players can buzz again (same track replay)
+  againBtn.addEventListener('click', () => {
+    ws.send(JSON.stringify({ type: 'partial_reset' }));
+  });
+
+  // "SIGUIENTE ▶" — full round reset, triggers auto-play of next track on host
   resetBtn.addEventListener('click', () => {
     ws.send(JSON.stringify({ type: 'reset' }));
   });
