@@ -29,7 +29,11 @@ export function WebSocketProvider({ children }) {
 
       if (msg.type === 'state') store.applyState(msg)
       if (msg.type === 'joined') { store.setMyId(msg.id); store.setMyColor(msg.color) }
-      if (msg.type === 'full_reset') store.fullReset()
+      if (msg.type === 'full_reset') {
+        store.fullReset()
+        localStorage.removeItem('buzzer_token')
+        localStorage.removeItem('buzzer_name')
+      }
 
       handlers.current[msg.type]?.(msg)
     }

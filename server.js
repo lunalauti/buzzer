@@ -172,6 +172,7 @@ let gameState = {
   winner: null, winnerColor: null, winnerId: null,
   locked: false, players: {}, currentTrack: null, buzzOrder: [],
   scores: {}, awaitingChoice: false,
+  totalRounds: 0, currentRound: 0, gameOver: false,
 }
 
 const PLAYER_COLORS = [
@@ -179,6 +180,11 @@ const PLAYER_COLORS = [
   { bg: '#C9B1FF' }, { bg: '#FF9F43' }, { bg: '#74B9FF' }, { bg: '#FD79A8' },
 ]
 let colorIndex = 0
+
+// token → playerId (persists through disconnects within a session)
+const tokenMap = {}
+// playerId → { name, color, token } (persists through disconnects)
+const playerData = {}
 
 function broadcast(data) {
   const msg = JSON.stringify(data)
@@ -197,7 +203,20 @@ function broadcastState() {
     buzzOrder:      gameState.buzzOrder,
     scores:         gameState.scores,
     awaitingChoice: gameState.awaitingChoice,
+    totalRounds:    gameState.totalRounds,
+    currentRound:   gameState.currentRound,
+    gameOver:       gameState.gameOver,
   })
+}
+
+function endRound() {
+  if (gameState.totalRounds > 0 && gameState.currentRound >= gameState.totalRounds) {
+    gameState.gameOver = true
+    broadcast({ type: 'game_over' })
+    broadcastState()
+    return
+  }
+  broadcast({ type: 'round_reset' })
 }
 
 wss.on('connection', (ws) => {
@@ -208,10 +227,26 @@ wss.on('connection', (ws) => {
     try { msg = JSON.parse(raw) } catch { return }
 
     if (msg.type === 'join') {
+      const { name, token } = msg
+
+      // Reconnect via token if the player was previously registered
+      if (token && tokenMap[token] && playerData[tokenMap[token]]) {
+        const existingId = tokenMap[token]
+        const saved = playerData[existingId]
+        playerId = existingId
+        gameState.players[playerId] = { id: playerId, name: saved.name, color: saved.color, ws }
+        ws.send(JSON.stringify({ type: 'joined', id: playerId, color: saved.color }))
+        broadcastState()
+        return
+      }
+
       playerId = Date.now() + Math.random().toString(36).slice(2)
       const color = PLAYER_COLORS[colorIndex % PLAYER_COLORS.length]
       colorIndex++
-      gameState.players[playerId] = { id: playerId, name: msg.name || 'Jugador', color: color.bg, ws }
+      const playerName = name || 'Jugador'
+      playerData[playerId] = { name: playerName, color: color.bg, token: token || null }
+      gameState.players[playerId] = { id: playerId, name: playerName, color: color.bg, ws }
+      if (token) tokenMap[token] = playerId
       ws.send(JSON.stringify({ type: 'joined', id: playerId, color: color.bg }))
       broadcastState()
     }
@@ -243,12 +278,15 @@ wss.on('connection', (ws) => {
       gameState.winnerColor = null
       gameState.buzzOrder = []
       gameState.awaitingChoice = false
-      broadcast({ type: 'round_reset' })
+      endRound()
       broadcastState()
     }
 
     if (msg.type === 'play_track' && msg.track) {
       gameState.currentTrack = msg.track
+      if (gameState.totalRounds > 0 && !gameState.gameOver) {
+        gameState.currentRound = gameState.currentRound === 0 ? 1 : gameState.currentRound + 1
+      }
       broadcastState()
     }
 
@@ -290,7 +328,7 @@ wss.on('connection', (ws) => {
         if (nonBuzzed === 0) {
           gameState.buzzOrder = []
           gameState.awaitingChoice = false
-          broadcast({ type: 'round_reset' })
+          endRound()
         } else {
           gameState.awaitingChoice = true
         }
@@ -305,7 +343,14 @@ wss.on('connection', (ws) => {
       gameState.winnerColor = null
       gameState.buzzOrder = []
       gameState.awaitingChoice = false
-      broadcast({ type: 'round_reset' })
+      endRound()
+      broadcastState()
+    }
+
+    if (msg.type === 'set_rounds') {
+      gameState.totalRounds = Math.max(1, Math.min(20, Number(msg.count) || 1))
+      gameState.currentRound = 0
+      gameState.gameOver = false
       broadcastState()
     }
 
@@ -330,8 +375,10 @@ wss.on('connection', (ws) => {
 
     if (msg.type === 'full_reset') {
       broadcast({ type: 'full_reset' })
-      gameState = { winner: null, winnerId: null, winnerColor: null, locked: false, players: {}, currentTrack: null, buzzOrder: [], scores: {}, awaitingChoice: false }
+      gameState = { winner: null, winnerId: null, winnerColor: null, locked: false, players: {}, currentTrack: null, buzzOrder: [], scores: {}, awaitingChoice: false, totalRounds: 0, currentRound: 0, gameOver: false }
       colorIndex = 0
+      for (const k of Object.keys(tokenMap)) delete tokenMap[k]
+      for (const k of Object.keys(playerData)) delete playerData[k]
       broadcastState()
     }
   })

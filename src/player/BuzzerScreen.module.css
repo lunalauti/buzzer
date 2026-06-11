@@ -57,6 +57,20 @@
   transform: none;
 }
 
+.roundBadge {
+  position: absolute;
+  top: 56px;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 4px 14px;
+}
+
 .lockedInfo {
   position: absolute;
   bottom: 40px;

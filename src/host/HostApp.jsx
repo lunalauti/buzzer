@@ -8,11 +8,14 @@ import { useSpotifyPlayback } from '../hooks/useSpotifyPlayback'
 import ConnDot from '../components/ConnDot'
 import Confetti from '../components/Confetti'
 import QRPanel from './QRPanel'
+import RoundsPanel from './RoundsPanel'
+import PodiumOverlay from './PodiumOverlay'
 import SpotifyBox from './SpotifyBox'
 import WinnerBanner from './WinnerBanner'
 import BuzzOrderList from './BuzzOrderList'
 import PlayersGrid from './PlayersGrid'
 import SettingsModal from './SettingsModal'
+import SetupModal from './SetupModal'
 import NowPlayingCard from './NowPlayingCard'
 import styles from './HostApp.module.css'
 
@@ -27,6 +30,9 @@ export default function HostApp() {
   const locked = useGameStore(s => s.locked)
   const buzzOrder = useGameStore(s => s.buzzOrder)
   const scores = useGameStore(s => s.scores)
+  const gameOver = useGameStore(s => s.gameOver)
+  const totalRounds = useGameStore(s => s.totalRounds)
+  const [podiumVisible, setPodiumVisible] = useState(false)
 
   const npCardVisible = useSpotifyStore(s => s.npCardVisible)
   const currentTrackData = useSpotifyStore(s => s.currentTrackData)
@@ -85,6 +91,19 @@ export default function HostApp() {
     })
   }, [onMessage])
 
+  // Handle game_over → show podium
+  useEffect(() => {
+    return onMessage('game_over', () => {
+      clearAutoPlay()
+      setPodiumVisible(true)
+    })
+  }, [onMessage, clearAutoPlay])
+
+  // Also show podium if gameOver flag arrives via state (e.g. page refresh)
+  useEffect(() => {
+    if (gameOver) setPodiumVisible(true)
+  }, [gameOver])
+
   // Update npCard data when track and winner are available
   useEffect(() => {
     if (!locked) {
@@ -102,13 +121,32 @@ export default function HostApp() {
     useSpotifyStore.getState().setMode('login')
     useSpotifyStore.getState().resetTrack()
     useSpotifyStore.getState().setNpCardVisible(false)
+    setPodiumVisible(false)
     send('full_reset')
+  }
+
+  const handleNewGame = () => {
+    setPodiumVisible(false)
+    handleReset()
+  }
+
+  const handleSetupConfirm = (rounds) => {
+    localStorage.removeItem('buzzer_setup_rounds')
+    send('set_rounds', { count: rounds })
   }
 
   return (
     <>
       {locked && winnerColor && <Confetti baseColor={winnerColor} />}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {totalRounds === 0 && <SetupModal onConfirm={handleSetupConfirm} onLogin={login} />}
+      {podiumVisible && (
+        <PodiumOverlay
+          players={players}
+          scores={scores}
+          onNewGame={handleNewGame}
+        />
+      )}
 
       <header className={styles.header}>
         <div className={styles.logoWrap}>
@@ -126,7 +164,10 @@ export default function HostApp() {
       </header>
 
       <main className={styles.main}>
-        <QRPanel />
+        <div className={styles.rightCol}>
+          <QRPanel />
+          <RoundsPanel />
+        </div>
 
         <SpotifyBox
           progressBarRef={progressBarRef}

@@ -2,7 +2,7 @@ import { useGameStore } from '../store/gameStore'
 import { useWs } from '../contexts/WebSocketContext'
 import styles from './BuzzerScreen.module.css'
 
-export default function BuzzerScreen({ myColor, hasBuzzed, isLocked, winner }) {
+export default function BuzzerScreen({ myColor, hasBuzzed, isLocked, winner, totalRounds, currentRound }) {
   const myId = useGameStore(s => s.myId)
   const players = useGameStore(s => s.players)
   const { send } = useWs()
@@ -17,6 +17,11 @@ export default function BuzzerScreen({ myColor, hasBuzzed, isLocked, winner }) {
   return (
     <div className={styles.screen} style={{ touchAction: 'manipulation', overflow: 'hidden' }}>
       <div className={styles.nameTop}>{myName}</div>
+      {totalRounds > 0 && currentRound > 0 && (
+        <div className={styles.roundBadge}>
+          RONDA {currentRound} / {totalRounds}
+        </div>
+      )}
       <button
         className={styles.buzzBtn}
         style={{ '--player-color': myColor }}
