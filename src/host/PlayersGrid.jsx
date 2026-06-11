@@ -17,7 +17,7 @@ function useAvatarMap() {
   }
 }
 
-export default function PlayersGrid({ players, winner, buzzOrder, locked }) {
+export default function PlayersGrid({ players, winner, buzzOrder, locked, scores = {} }) {
   const getAvatar = useAvatarMap()
 
   if (players.length === 0) {
@@ -54,6 +54,7 @@ export default function PlayersGrid({ players, winner, buzzOrder, locked }) {
               {getAvatar(p.id)}
             </div>
             <div className={styles.name}>{p.name}</div>
+            <div className={styles.score}>{scores[p.id] ?? 0} pts</div>
           </div>
         )
       })}

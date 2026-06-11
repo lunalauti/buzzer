@@ -88,7 +88,8 @@ app.get('/auth/refresh', async (req, res) => {
 
 app.get('/api/server-info', (req, res) => {
   const ip = getLocalIP()
-  const PORT = process.env.PORT || 3000
+  const serverPort = Number(process.env.PORT) || 3000
+  const PORT = serverPort === 3001 ? 3000 : serverPort
   res.json({ ip, port: PORT, url: `http://${ip}:${PORT}` })
 })
 
@@ -170,6 +171,7 @@ app.get('/api/random-track', async (req, res) => {
 let gameState = {
   winner: null, winnerColor: null, winnerId: null,
   locked: false, players: {}, currentTrack: null, buzzOrder: [],
+  scores: {}, awaitingChoice: false,
 }
 
 const PLAYER_COLORS = [
@@ -191,8 +193,10 @@ function broadcastState() {
     winnerColor:  gameState.winnerColor,
     locked:       gameState.locked,
     players:      Object.values(gameState.players).map(p => ({ id: p.id, name: p.name, color: p.color })),
-    currentTrack: gameState.currentTrack,
-    buzzOrder:    gameState.buzzOrder,
+    currentTrack:   gameState.currentTrack,
+    buzzOrder:      gameState.buzzOrder,
+    scores:         gameState.scores,
+    awaitingChoice: gameState.awaitingChoice,
   })
 }
 
@@ -217,6 +221,7 @@ wss.on('connection', (ws) => {
       if (!player) return
       const alreadyBuzzed = gameState.buzzOrder.some(b => b.id === playerId)
       if (!alreadyBuzzed) {
+        gameState.awaitingChoice = false
         gameState.buzzOrder.push({ id: player.id, name: player.name, color: player.color })
         if (!gameState.locked) {
           gameState.locked = true
@@ -229,11 +234,15 @@ wss.on('connection', (ws) => {
     }
 
     if (msg.type === 'reset') {
+      if (gameState.winnerId) {
+        gameState.scores[gameState.winnerId] = (gameState.scores[gameState.winnerId] || 0) + 1
+      }
       gameState.locked = false
       gameState.winner = null
       gameState.winnerId = null
       gameState.winnerColor = null
       gameState.buzzOrder = []
+      gameState.awaitingChoice = false
       broadcast({ type: 'round_reset' })
       broadcastState()
     }
@@ -260,6 +269,56 @@ wss.on('connection', (ws) => {
       broadcastState()
     }
 
+    if (msg.type === 'surrender') {
+      if (!gameState.winner) return
+      if (gameState.winnerId) {
+        gameState.scores[gameState.winnerId] = (gameState.scores[gameState.winnerId] || 0) - 1
+      }
+      const nextPlayer = gameState.buzzOrder[1]
+      if (nextPlayer) {
+        gameState.buzzOrder.shift()
+        gameState.winner = nextPlayer.name
+        gameState.winnerId = nextPlayer.id
+        gameState.winnerColor = nextPlayer.color
+        gameState.locked = true
+      } else {
+        const nonBuzzed = Object.keys(gameState.players).length - gameState.buzzOrder.length
+        gameState.locked = false
+        gameState.winner = null
+        gameState.winnerId = null
+        gameState.winnerColor = null
+        if (nonBuzzed === 0) {
+          gameState.buzzOrder = []
+          gameState.awaitingChoice = false
+          broadcast({ type: 'round_reset' })
+        } else {
+          gameState.awaitingChoice = true
+        }
+      }
+      broadcastState()
+    }
+
+    if (msg.type === 'skip') {
+      gameState.locked = false
+      gameState.winner = null
+      gameState.winnerId = null
+      gameState.winnerColor = null
+      gameState.buzzOrder = []
+      gameState.awaitingChoice = false
+      broadcast({ type: 'round_reset' })
+      broadcastState()
+    }
+
+    if (msg.type === 'replay_request') {
+      gameState.awaitingChoice = false
+      gameState.locked = false
+      gameState.winner = null
+      gameState.winnerId = null
+      gameState.winnerColor = null
+      broadcast({ type: 'round_replay' })
+      broadcastState()
+    }
+
     if (msg.type === 'game_reset') {
       gameState.locked = false
       gameState.winner = null
@@ -271,7 +330,7 @@ wss.on('connection', (ws) => {
 
     if (msg.type === 'full_reset') {
       broadcast({ type: 'full_reset' })
-      gameState = { winner: null, winnerId: null, winnerColor: null, locked: false, players: {}, currentTrack: null, buzzOrder: [] }
+      gameState = { winner: null, winnerId: null, winnerColor: null, locked: false, players: {}, currentTrack: null, buzzOrder: [], scores: {}, awaitingChoice: false }
       colorIndex = 0
       broadcastState()
     }

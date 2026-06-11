@@ -202,11 +202,11 @@ export function useSpotifyPlayback({ spFetch, clearAuth, send }) {
     }
   }, [extractPlaylistId, clearProgress, spFetch, setMode, setCurrentPlaylistId, setCurrentTrackUri, setCurrentTrackData, setTrackRevealed, startProgress, send])
 
-  const replayTrack = useCallback(async () => {
+  const replayTrack = useCallback(async ({ sendReset = true } = {}) => {
     const { deviceId, currentTrackUri, playDuration } = useSpotifyStore.getState()
     if (!currentTrackUri) return
     setTrackRevealed(false)
-    if (send) send('partial_reset')
+    if (sendReset && send) send('partial_reset')
     setMode('fetching')
     const playRes = await spFetch(
       `https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`,
