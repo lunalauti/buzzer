@@ -1,0 +1,73 @@
+.screen {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  position: relative;
+}
+
+.nameTop {
+  position: absolute;
+  top: 24px;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.buzzBtn {
+  width: min(72vw, 320px);
+  height: min(72vw, 320px);
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  position: relative;
+  transition: transform 0.08s;
+  -webkit-tap-highlight-color: transparent;
+  outline: none;
+  background: var(--player-color, #FF6B6B);
+  box-shadow:
+    0 0 0 12px color-mix(in srgb, var(--player-color, #FF6B6B) 25%, transparent),
+    0 12px 0 0 color-mix(in srgb, var(--player-color, #FF6B6B) 50%, #000),
+    0 16px 40px color-mix(in srgb, var(--player-color, #FF6B6B) 40%, transparent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.buzzBtn::after {
+  content: '¡BUZZ!';
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: clamp(32px, 10vw, 52px);
+  color: rgba(0,0,0,0.55);
+  letter-spacing: 2px;
+}
+.buzzBtn:active:not(:disabled) {
+  transform: scale(0.93) translateY(6px);
+  box-shadow:
+    0 0 0 12px color-mix(in srgb, var(--player-color, #FF6B6B) 25%, transparent),
+    0 4px 0 0 color-mix(in srgb, var(--player-color, #FF6B6B) 50%, #000),
+    0 6px 20px color-mix(in srgb, var(--player-color, #FF6B6B) 40%, transparent);
+}
+.buzzBtn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.lockedInfo {
+  position: absolute;
+  bottom: 40px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 2px;
+  padding: 0 24px;
+  transition: color 0.3s;
+}
+.lockedInfo.alert { color: var(--accent); }

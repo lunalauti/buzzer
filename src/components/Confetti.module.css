@@ -1,0 +1,16 @@
+.wrap {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 99;
+  overflow: hidden;
+}
+
+.piece {
+  position: absolute;
+  width: 10px;
+  height: 14px;
+  top: -20px;
+  animation: confettiFall linear forwards;
+  border-radius: 2px;
+}

@@ -1,0 +1,38 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  z-index: 100;
+  padding: 24px;
+  background: var(--bg);
+  animation: overlayIn 0.4s cubic-bezier(.34,1.2,.64,1);
+}
+
+.reached {
+  font-size: 12px;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.rank {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: clamp(88px, 32vw, 160px);
+  color: var(--pos-color, #888);
+  line-height: 1;
+  text-shadow: 4px 4px 0 rgba(0,0,0,0.35);
+}
+
+.winnerInfo {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--muted);
+  text-align: center;
+  max-width: 240px;
+  line-height: 1.5;
+}

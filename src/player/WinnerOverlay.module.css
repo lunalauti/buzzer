@@ -1,0 +1,104 @@
+.overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  z-index: 100;
+  padding: 24px;
+  animation: overlayIn 0.4s cubic-bezier(.34,1.2,.64,1);
+}
+
+.trophy {
+  font-size: 64px;
+  animation: bounce 0.6s ease infinite alternate;
+}
+
+.label {
+  font-size: 14px;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  color: rgba(0,0,0,0.5);
+  font-weight: 900;
+}
+
+.name {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: clamp(48px, 18vw, 96px);
+  color: #0d0d0f;
+  text-align: center;
+  line-height: 1;
+  text-shadow: 3px 3px 0 rgba(0,0,0,0.2);
+}
+
+.trackReveal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  text-align: center;
+  background: rgba(0,0,0,0.15);
+  border-radius: 14px;
+  padding: 16px 24px;
+  width: 100%;
+  max-width: 280px;
+  animation: overlayIn 0.3s cubic-bezier(.34,1.3,.64,1);
+}
+
+.trackName {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: clamp(18px, 6vw, 32px);
+  color: #0d0d0f;
+  line-height: 1.1;
+}
+
+.trackArtist {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(0,0,0,0.45);
+  letter-spacing: 1px;
+}
+
+.revealBtn {
+  margin-top: 4px;
+  padding: 14px 36px;
+  background: rgba(0,0,0,0.15);
+  color: rgba(0,0,0,0.7);
+  border: 3px solid rgba(0,0,0,0.2);
+  border-radius: 14px;
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 18px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.revealBtn:hover { background: rgba(0,0,0,0.25); }
+
+.actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: center;
+  margin-top: 12px;
+}
+
+.btn {
+  padding: 16px 40px;
+  background: rgba(0,0,0,0.2);
+  color: rgba(0,0,0,0.6);
+  border: 3px solid rgba(0,0,0,0.2);
+  border-radius: 14px;
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 18px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.btn:hover { background: rgba(0,0,0,0.3); }
+
+.btnNext {
+  background: rgba(0,0,0,0.3);
+  border-style: dashed;
+}
