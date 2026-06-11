@@ -26,6 +26,7 @@ export default function HostApp() {
   const winnerColor = useGameStore(s => s.winnerColor)
   const locked = useGameStore(s => s.locked)
   const buzzOrder = useGameStore(s => s.buzzOrder)
+  const scores = useGameStore(s => s.scores)
 
   const npCardVisible = useSpotifyStore(s => s.npCardVisible)
   const currentTrackData = useSpotifyStore(s => s.currentTrackData)
@@ -69,6 +70,13 @@ export default function HostApp() {
       scheduleAutoPlay(playlistValue)
     })
   }, [onMessage, clearAutoPlay, scheduleAutoPlay, playlistValue])
+
+  // Handle round_replay → replay same track (server already did state cleanup)
+  useEffect(() => {
+    return onMessage('round_replay', () => {
+      replayTrack({ sendReset: false })
+    })
+  }, [onMessage, replayTrack])
 
   // Handle reveal_track → show now playing card
   useEffect(() => {
@@ -126,6 +134,7 @@ export default function HostApp() {
           setPlaylistValue={setPlaylistValue}
           onPlay={() => playRandom(playlistValue)}
           onReplay={replayTrack}
+          onSkip={async () => { await stopPlayback(); send('skip') }}
           onStop={stopPlayback}
           onAddTime={() => addTime(5000)}
           onLoadDevices={loadDevices}
@@ -143,7 +152,7 @@ export default function HostApp() {
         )}
 
         <div className={styles.sectionTitle}>Jugadores conectados</div>
-        <PlayersGrid players={players} winner={winner} buzzOrder={buzzOrder} locked={locked} />
+        <PlayersGrid players={players} winner={winner} buzzOrder={buzzOrder} locked={locked} scores={scores} />
       </main>
     </>
   )

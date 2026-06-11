@@ -19,6 +19,7 @@ export default function SpotifyBox({
   setPlaylistValue,
   onPlay,
   onReplay,
+  onSkip,
   onStop,
   onAddTime,
   onLoadDevices,
@@ -148,6 +149,7 @@ export default function SpotifyBox({
               </button>
             )}
             <button className={styles.spBtn} disabled={isFetching} onClick={onPlay}>⏭ SIGUIENTE</button>
+            <button className={styles.spBtn} disabled={isFetching} onClick={onSkip}>⏩ SALTEAR</button>
             {!isStopped && (
               <button className={`${styles.spBtn} ${styles.stopBtn}`} disabled={isFetching} onClick={onStop}>
                 ⏹ DETENER

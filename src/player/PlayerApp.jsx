@@ -4,6 +4,7 @@ import JoinScreen from './JoinScreen'
 import BuzzerScreen from './BuzzerScreen'
 import WinnerOverlay from './WinnerOverlay'
 import PositionOverlay from './PositionOverlay'
+import ChoiceOverlay from './ChoiceOverlay'
 import ConnDot from '../components/ConnDot'
 
 export default function PlayerApp() {
@@ -15,6 +16,7 @@ export default function PlayerApp() {
   const buzzOrder = useGameStore(s => s.buzzOrder)
   const currentTrack = useGameStore(s => s.currentTrack)
   const locked = useGameStore(s => s.locked)
+  const awaitingChoice = useGameStore(s => s.awaitingChoice)
   const { connected } = useWs()
 
   const hasBuzzed = !!myId && buzzOrder.some(b => b.id === myId)
@@ -50,6 +52,7 @@ export default function PlayerApp() {
               winner={winner}
             />
           )}
+          {!isWinner && !hasBuzzed && awaitingChoice && <ChoiceOverlay />}
         </>
       )}
     </>

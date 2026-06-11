@@ -8,6 +8,8 @@ export const useGameStore = create((set) => ({
   locked: false,
   buzzOrder: [],
   currentTrack: null,
+  scores: {},
+  awaitingChoice: false,
   myId: null,
   myColor: null,
 
@@ -22,6 +24,8 @@ export const useGameStore = create((set) => ({
     locked: !!msg.locked,
     buzzOrder: msg.buzzOrder || [],
     currentTrack: msg.currentTrack || null,
+    scores: msg.scores || {},
+    awaitingChoice: !!msg.awaitingChoice,
   }),
 
   fullReset: () => set({
@@ -32,6 +36,8 @@ export const useGameStore = create((set) => ({
     locked: false,
     buzzOrder: [],
     currentTrack: null,
+    scores: {},
+    awaitingChoice: false,
     myId: null,
     myColor: null,
   }),

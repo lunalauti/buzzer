@@ -32,8 +32,9 @@ export default function WinnerOverlay({ winnerColor, winnerName, currentTrack })
         )}
 
         <div className={styles.actions}>
-          <button className={styles.btn} onClick={() => send('partial_reset')}>DE NUEVO</button>
+          <button className={styles.btn} onClick={() => send('surrender')}>RENDIRSE</button>
           <button className={`${styles.btn} ${styles.btnNext}`} onClick={() => send('reset')}>SIGUIENTE ▶</button>
+          <button className={`${styles.btn} ${styles.btnSkip}`} onClick={() => send('skip')}>⏩ SALTEAR</button>
         </div>
       </div>
     </>
