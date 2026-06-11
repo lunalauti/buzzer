@@ -1,7 +1,7 @@
 import { useMemo, useRef } from 'react'
 import styles from './PlayersGrid.module.css'
 
-const AVATARS = ['🦊','🐯','🦁','🐸','🦄','🐙','🦋','🐧','🦖','🐳','🦅','🐺','🦝','🐻','🦩','🐬']
+const AVATARS = ['🦊', '🐯', '🦁', '🐸', '🦄', '🐙', '🦋', '🐧', '🦖', '🐳', '🦅', '🐺', '🦝', '🐻', '🦩', '🐬']
 
 function useAvatarMap() {
   const avatarMap = useRef({})
@@ -25,7 +25,6 @@ export default function PlayersGrid({ players, winner, buzzOrder, locked, scores
       <div className={styles.empty}>
         <div className={styles.emptyIcon}>📱</div>
         <div className={styles.emptyText}>Esperando jugadores</div>
-        <div className={styles.emptyUrl}>{location.host}</div>
       </div>
     )
   }
