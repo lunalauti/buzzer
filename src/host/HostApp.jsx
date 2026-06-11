@@ -15,6 +15,7 @@ import WinnerBanner from './WinnerBanner'
 import BuzzOrderList from './BuzzOrderList'
 import PlayersGrid from './PlayersGrid'
 import SettingsModal from './SettingsModal'
+import SetupModal from './SetupModal'
 import NowPlayingCard from './NowPlayingCard'
 import styles from './HostApp.module.css'
 
@@ -30,6 +31,7 @@ export default function HostApp() {
   const buzzOrder = useGameStore(s => s.buzzOrder)
   const scores = useGameStore(s => s.scores)
   const gameOver = useGameStore(s => s.gameOver)
+  const totalRounds = useGameStore(s => s.totalRounds)
   const [podiumVisible, setPodiumVisible] = useState(false)
 
   const npCardVisible = useSpotifyStore(s => s.npCardVisible)
@@ -128,10 +130,16 @@ export default function HostApp() {
     handleReset()
   }
 
+  const handleSetupConfirm = (rounds) => {
+    localStorage.removeItem('buzzer_setup_rounds')
+    send('set_rounds', { count: rounds })
+  }
+
   return (
     <>
       {locked && winnerColor && <Confetti baseColor={winnerColor} />}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {totalRounds === 0 && <SetupModal onConfirm={handleSetupConfirm} onLogin={login} />}
       {podiumVisible && (
         <PodiumOverlay
           players={players}
