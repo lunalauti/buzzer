@@ -1,10 +1,12 @@
 {
   "name": "buzzer",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "",
-  "main": "index.js",
+  "type": "module",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "concurrently \"cross-env PORT=3001 node server.js\" \"vite\"",
+    "build": "vite build",
+    "start": "node server.js"
   },
   "keywords": [],
   "author": "",
@@ -12,6 +14,17 @@
   "dependencies": {
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "ws": "^8.21.0"
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "react-router-dom": "^7.17.0",
+    "ws": "^8.21.0",
+    "zustand": "^5.0.14"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.7.0",
+    "concurrently": "^9.2.1",
+    "cross-env": "^10.1.0",
+    "playwright": "^1.60.0",
+    "vite": "^6.4.3"
   }
 }

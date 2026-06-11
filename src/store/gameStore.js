@@ -1,0 +1,38 @@
+import { create } from 'zustand'
+
+export const useGameStore = create((set) => ({
+  players: [],
+  winner: null,
+  winnerId: null,
+  winnerColor: null,
+  locked: false,
+  buzzOrder: [],
+  currentTrack: null,
+  myId: null,
+  myColor: null,
+
+  setMyId: (id) => set({ myId: id }),
+  setMyColor: (color) => set({ myColor: color }),
+
+  applyState: (msg) => set({
+    players: msg.players || [],
+    winner: msg.winner || null,
+    winnerId: msg.winnerId || null,
+    winnerColor: msg.winnerColor || null,
+    locked: !!msg.locked,
+    buzzOrder: msg.buzzOrder || [],
+    currentTrack: msg.currentTrack || null,
+  }),
+
+  fullReset: () => set({
+    players: [],
+    winner: null,
+    winnerId: null,
+    winnerColor: null,
+    locked: false,
+    buzzOrder: [],
+    currentTrack: null,
+    myId: null,
+    myColor: null,
+  }),
+}))

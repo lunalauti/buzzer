@@ -1,0 +1,17 @@
+.dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #333;
+  transition: background 0.4s, box-shadow 0.4s;
+}
+
+.dot.on { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
+
+.dot.fixed {
+  position: fixed;
+  top: 14px;
+  right: 16px;
+  width: 10px;
+  height: 10px;
+}
