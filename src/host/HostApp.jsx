@@ -79,14 +79,10 @@ export default function HostApp() {
 
   // Update npCard data when track and winner are available
   useEffect(() => {
-    if (locked && winner && currentTrackData) {
-      useSpotifyStore.getState().setNpCardVisible(false)
-    }
     if (!locked) {
       useSpotifyStore.getState().setNpCardVisible(false)
-      useSpotifyStore.getState().setCurrentTrackData(null)
     }
-  }, [locked, winner, currentTrackData])
+  }, [locked, winner])
 
   const handleReset = async () => {
     clearAutoPlay()

@@ -16,9 +16,11 @@ export function useSpotifyPlayback({ spFetch, clearAuth, send }) {
     progressTimer.current = null
   }, [])
 
+  const PAUSE_LATENCY_MS = 1000
+
   const startProgress = useCallback((durationMs) => {
     clearProgress()
-    const endTime = Date.now() + durationMs
+    const endTime = Date.now() + Math.max(durationMs - PAUSE_LATENCY_MS, 200)
     setPlayEndTime(endTime)
     progressTimer.current = setInterval(async () => {
       const remaining = endTime - Date.now()
@@ -33,7 +35,9 @@ export function useSpotifyPlayback({ spFetch, clearAuth, send }) {
     clearProgress()
     if (progressBarRef.current) progressBarRef.current.style.width = '0%'
     await spFetch('https://api.spotify.com/v1/me/player/pause', { method: 'PUT' }).catch(() => {})
-    setMode('stopped')
+    // Only transition to stopped if a new playRandom hasn't already started
+    const { spotifyMode } = useSpotifyStore.getState()
+    if (spotifyMode === 'playing') setMode('stopped')
   }, [clearProgress, spFetch, setMode])
 
   const loadDevices = useCallback(async () => {
@@ -64,15 +68,11 @@ export function useSpotifyPlayback({ spFetch, clearAuth, send }) {
 
     clearProgress()
     setTrackRevealed(false)
+    setCurrentTrackData(null)
     if (send) send('game_reset')
     setMode('fetching')
 
     try {
-      await spFetch(
-        `https://api.spotify.com/v1/me/player/shuffle?state=false&device_id=${deviceId}`,
-        { method: 'PUT' }
-      ).catch(() => {})
-
       const playlistChanged = playlistId !== currentPlaylistId
       setCurrentPlaylistId(playlistId)
 
@@ -109,7 +109,13 @@ export function useSpotifyPlayback({ spFetch, clearAuth, send }) {
           }
         } catch {}
       }
-      if (!skipConfirmed) await new Promise(r => setTimeout(r, 200))
+      if (!skipConfirmed) {
+        await spFetch(
+          `https://api.spotify.com/v1/me/player/next?device_id=${deviceId}`,
+          { method: 'POST' }
+        ).catch(() => {})
+        await new Promise(r => setTimeout(r, 600))
+      }
 
       let playRes = await spFetch(
         `https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`,
@@ -157,26 +163,34 @@ export function useSpotifyPlayback({ spFetch, clearAuth, send }) {
       setMode('playing')
       startProgress(playDuration)
 
+      // Poll currently-playing AFTER play starts — this is the data shown on REVELAR
       ;(async () => {
-        for (let attempt = 0; attempt < 4; attempt++) {
-          await new Promise(r => setTimeout(r, attempt === 0 ? 800 : 500))
+        console.log('[REVELAR] IIFE iniciada, polling currently-playing...')
+        for (let attempt = 0; attempt < 5; attempt++) {
+          await new Promise(r => setTimeout(r, attempt === 0 ? 400 : 600))
           try {
             const r = await spFetch('https://api.spotify.com/v1/me/player/currently-playing')
+            console.log(`[REVELAR] attempt ${attempt} → status ${r.status}`)
             if (r.ok && r.status !== 204) {
               const d = await r.json()
               const t = d?.item
-              if (t && t.uri !== uriBeforeSkip) {
+              console.log('[REVELAR] item:', t?.name, t?.uri)
+              if (t) {
                 setCurrentTrackUri(t.uri)
                 const artist = (t.artists || []).map(a => a.name).join(', ')
                 const cover = t.album?.images?.[1]?.url || t.album?.images?.[0]?.url || null
                 const trackData = { name: t.name, artist, cover }
                 setCurrentTrackData(trackData)
+                console.log('[REVELAR] setCurrentTrackData OK:', trackData)
                 if (send) send('play_track', { track: { name: t.name, artist } })
                 return
               }
             }
-          } catch {}
+          } catch (e) {
+            console.error(`[REVELAR] attempt ${attempt} error:`, e)
+          }
         }
+        console.warn('[REVELAR] IIFE terminó sin datos — currentTrackData sigue null')
       })()
 
       return {}
@@ -205,7 +219,11 @@ export function useSpotifyPlayback({ spFetch, clearAuth, send }) {
     if (!playRes.ok && playRes.status !== 204) { setMode('stopped'); return }
     setMode('playing')
     startProgress(playDuration)
-  }, [spFetch, setMode, setTrackRevealed, startProgress, send])
+    // uris: [trackUri] breaks Spotify playlist context; null both so next playRandom reloads context
+    // and uriBeforeSkip=null ensures skip confirmation passes immediately
+    setCurrentPlaylistId(null)
+    setCurrentTrackUri(null)
+  }, [spFetch, setMode, setTrackRevealed, startProgress, send, setCurrentPlaylistId, setCurrentTrackUri])
 
   const addTime = useCallback((extraMs) => {
     const { playEndTime, playDuration } = useSpotifyStore.getState()

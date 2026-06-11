@@ -50,7 +50,8 @@ app.get('/auth/login', (req, res) => {
 
 app.get('/callback', async (req, res) => {
   const { code, state, error } = req.query
-  if (error || !oauthStates.has(state)) return res.redirect('/host?auth_error=1')
+  const FRONTEND = 'http://localhost:3000'
+  if (error || !oauthStates.has(state)) return res.redirect(`${FRONTEND}/host?auth_error=1`)
   oauthStates.delete(state)
 
   const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET } = process.env
@@ -62,10 +63,10 @@ app.get('/callback', async (req, res) => {
     body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: 'http://127.0.0.1:3000/callback' }),
   })
   const data = await tokenRes.json()
-  if (!data.access_token) return res.redirect('/host?auth_error=1')
+  if (!data.access_token) return res.redirect(`${FRONTEND}/host?auth_error=1`)
 
   const expiry = Date.now() + data.expires_in * 1000
-  res.redirect(`/host?sp_token=${data.access_token}&sp_expiry=${expiry}&sp_refresh=${data.refresh_token}`)
+  res.redirect(`${FRONTEND}/host?sp_token=${data.access_token}&sp_expiry=${expiry}&sp_refresh=${data.refresh_token}`)
 })
 
 app.get('/auth/refresh', async (req, res) => {
@@ -294,6 +295,9 @@ if (existsSync(distDir)) {
 
 const PORT = process.env.PORT || 3000
 server.listen(PORT, () => {
-  console.log(`\n🎮 Buzzer corriendo en http://localhost:${PORT}`)
-  console.log(`   Vista host: http://localhost:${PORT}/host\n`)
+  const isDev = PORT === 3001
+  const frontPort = isDev ? 3000 : PORT
+  console.log(`\n🎮 Buzzer corriendo en http://localhost:${frontPort}`)
+  console.log(`   Vista host: http://localhost:${frontPort}/host\n`)
+  if (isDev) console.log('   (backend en :3001, frontend en :3000 via Vite)\n')
 })

@@ -108,15 +108,23 @@ export default function SpotifyBox({
             <div className={styles.progressBar} ref={progressBarRef} />
           </div>
 
-          {trackRevealed && currentTrackData && (
+          {trackRevealed && (
             <div className={styles.trackReveal}>
-              {currentTrackData.cover && (
-                <img className={styles.trackCover} src={currentTrackData.cover} alt="cover" />
+              {currentTrackData ? (
+                <>
+                  {currentTrackData.cover && (
+                    <img className={styles.trackCover} src={currentTrackData.cover} alt="cover" />
+                  )}
+                  <div className={styles.trackText}>
+                    <div className={styles.trackName}>{currentTrackData.name}</div>
+                    <div className={styles.trackArtist}>{currentTrackData.artist}</div>
+                  </div>
+                </>
+              ) : (
+                <div className={styles.trackText}>
+                  <div className={styles.trackArtist}>Cargando...</div>
+                </div>
               )}
-              <div className={styles.trackText}>
-                <div className={styles.trackName}>{currentTrackData.name}</div>
-                <div className={styles.trackArtist}>{currentTrackData.artist}</div>
-              </div>
             </div>
           )}
 
@@ -124,7 +132,10 @@ export default function SpotifyBox({
             <button
               className={`${styles.spBtn} ${styles.revealBtn}`}
               disabled={isFetching}
-              onClick={() => setTrackRevealed(true)}
+              onClick={() => {
+                console.log('[REVELAR] botón presionado. currentTrackData:', currentTrackData)
+                setTrackRevealed(true)
+              }}
             >
               👁 REVELAR
             </button>
