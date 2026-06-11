@@ -1,0 +1,128 @@
+.panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+.title {
+  font-size: 10px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-align: center;
+}
+
+/* Pre-game picker */
+.picker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pickerBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  border: 2px solid var(--border);
+  background: transparent;
+  color: var(--text);
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+  font-family: 'Black Han Sans', sans-serif;
+  transition: border-color 0.15s, color 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.pickerBtn:hover { border-color: var(--accent); color: var(--accent); }
+.pickerBtn:active { transform: scale(0.93); }
+
+.pickerNum {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 40px;
+  color: var(--accent);
+  line-height: 1;
+  min-width: 48px;
+  text-align: center;
+}
+
+.confirmBtn {
+  width: 100%;
+  padding: 10px 20px;
+  background: var(--accent);
+  border: none;
+  color: #0d0d0f;
+  border-radius: 10px;
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 13px;
+  letter-spacing: 2px;
+  cursor: pointer;
+  transition: opacity 0.15s;
+}
+.confirmBtn:hover { opacity: 0.85; }
+.confirmBtn:active { transform: scale(0.97); }
+
+/* In-game counter */
+.counter {
+  display: flex;
+  align-items: baseline;
+  gap: 4px;
+}
+
+.current {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 52px;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.separator {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 24px;
+  color: var(--muted);
+}
+
+.total {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 28px;
+  color: var(--muted);
+  line-height: 1;
+}
+
+.progressTrack {
+  width: 100%;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+}
+
+/* Game over */
+.gameOverLabel {
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 36px;
+  color: var(--accent);
+  line-height: 1;
+}
+
+.roundsTotal {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+}

@@ -5,6 +5,7 @@ import BuzzerScreen from './BuzzerScreen'
 import WinnerOverlay from './WinnerOverlay'
 import PositionOverlay from './PositionOverlay'
 import ChoiceOverlay from './ChoiceOverlay'
+import GameOverScreen from './GameOverScreen'
 import ConnDot from '../components/ConnDot'
 
 export default function PlayerApp() {
@@ -17,12 +18,21 @@ export default function PlayerApp() {
   const currentTrack = useGameStore(s => s.currentTrack)
   const locked = useGameStore(s => s.locked)
   const awaitingChoice = useGameStore(s => s.awaitingChoice)
+  const gameOver = useGameStore(s => s.gameOver)
+  const players = useGameStore(s => s.players)
+  const scores = useGameStore(s => s.scores)
+  const totalRounds = useGameStore(s => s.totalRounds)
+  const currentRound = useGameStore(s => s.currentRound)
   const { connected } = useWs()
 
   const hasBuzzed = !!myId && buzzOrder.some(b => b.id === myId)
   const myPosition = hasBuzzed ? buzzOrder.findIndex(b => b.id === myId) + 1 : null
   const isWinner = !!winner && winnerId === myId
   const isLocked = locked && !!winner
+
+  if (gameOver && myId) {
+    return <GameOverScreen players={players} scores={scores} myId={myId} />
+  }
 
   return (
     <>
@@ -36,6 +46,8 @@ export default function PlayerApp() {
             hasBuzzed={hasBuzzed}
             isLocked={isLocked}
             winner={winner}
+            totalRounds={totalRounds}
+            currentRound={currentRound}
           />
           {isWinner && (
             <WinnerOverlay

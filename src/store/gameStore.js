@@ -10,6 +10,9 @@ export const useGameStore = create((set) => ({
   currentTrack: null,
   scores: {},
   awaitingChoice: false,
+  totalRounds: 0,
+  currentRound: 0,
+  gameOver: false,
   myId: null,
   myColor: null,
 
@@ -26,6 +29,9 @@ export const useGameStore = create((set) => ({
     currentTrack: msg.currentTrack || null,
     scores: msg.scores || {},
     awaitingChoice: !!msg.awaitingChoice,
+    totalRounds: msg.totalRounds || 0,
+    currentRound: msg.currentRound || 0,
+    gameOver: !!msg.gameOver,
   }),
 
   fullReset: () => set({
@@ -38,6 +44,9 @@ export const useGameStore = create((set) => ({
     currentTrack: null,
     scores: {},
     awaitingChoice: false,
+    totalRounds: 0,
+    currentRound: 0,
+    gameOver: false,
     myId: null,
     myColor: null,
   }),
