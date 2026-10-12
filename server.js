@@ -28,31 +28,143 @@ function getLocalIP() {
   return 'localhost'
 }
 
+const PLAYER_COLORS = [
+  { bg: '#FF6B6B' }, { bg: '#4ECDC4' }, { bg: '#FFE66D' }, { bg: '#A8E6CF' },
+  { bg: '#C9B1FF' }, { bg: '#FF9F43' }, { bg: '#74B9FF' }, { bg: '#FD79A8' },
+]
+
+function makeGameState() {
+  return {
+    winner: null, winnerColor: null, winnerId: null,
+    locked: false, players: {}, currentTrack: null, buzzOrder: [],
+    scores: {}, awaitingChoice: false,
+    totalRounds: 0, currentRound: 0, gameOver: false,
+  }
+}
+
+function generateRoomCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
+  let code = ''
+  for (let i = 0; i < 6; i++) code += chars[Math.floor(Math.random() * chars.length)]
+  return code
+}
+
+// ── ROOMS ──────────────────────────────────────────────────────────────────
+
+const rooms = new Map()
+
+function getOrCreateRoom(roomCode) {
+  if (!rooms.has(roomCode)) {
+    const ttlTimer = setTimeout(() => rooms.delete(roomCode), 8 * 60 * 60 * 1000)
+    rooms.set(roomCode, {
+      gameState: makeGameState(),
+      clients: new Set(),
+      tokenMap: {},
+      playerData: {},
+      colorIndex: 0,
+      ttlTimer,
+    })
+  }
+  return rooms.get(roomCode)
+}
+
+function broadcastToRoom(roomCode, data) {
+  const room = rooms.get(roomCode)
+  if (!room) return
+  const msg = JSON.stringify(data)
+  for (const client of room.clients) {
+    if (client.readyState === 1) client.send(msg)
+  }
+}
+
+function broadcastStateToRoom(roomCode) {
+  const room = rooms.get(roomCode)
+  if (!room) return
+  const { gameState: gs } = room
+  broadcastToRoom(roomCode, {
+    type:         'state',
+    winner:       gs.winner,
+    winnerId:     gs.winnerId,
+    winnerColor:  gs.winnerColor,
+    locked:       gs.locked,
+    players:      Object.values(gs.players).map(p => ({ id: p.id, name: p.name, color: p.color })),
+    currentTrack: gs.currentTrack,
+    buzzOrder:    gs.buzzOrder,
+    scores:       gs.scores,
+    awaitingChoice: gs.awaitingChoice,
+    totalRounds:  gs.totalRounds,
+    currentRound: gs.currentRound,
+    gameOver:     gs.gameOver,
+  })
+}
+
+function endRound(roomCode) {
+  const room = rooms.get(roomCode)
+  if (!room) return
+  const { gameState: gs } = room
+  if (gs.totalRounds > 0 && gs.currentRound >= gs.totalRounds) {
+    gs.gameOver = true
+    broadcastToRoom(roomCode, { type: 'game_over' })
+    broadcastStateToRoom(roomCode)
+    return
+  }
+  broadcastToRoom(roomCode, { type: 'round_reset' })
+}
+
+// ── API ────────────────────────────────────────────────────────────────────
+
 app.get('/api/config', (req, res) => {
   res.json({ spotifyClientId: process.env.SPOTIFY_CLIENT_ID })
 })
+
+app.post('/api/rooms', (req, res) => {
+  let code
+  do { code = generateRoomCode() } while (rooms.has(code))
+  getOrCreateRoom(code)
+  res.json({ roomCode: code })
+})
+
+app.get('/api/server-info', (req, res) => {
+  const ip = getLocalIP()
+  const serverPort = Number(process.env.PORT) || 3000
+  const PORT = serverPort === 3001 ? 3000 : serverPort
+  res.json({ ip, port: PORT, url: `http://${ip}:${PORT}` })
+})
+
+// ── SPOTIFY OAUTH ──────────────────────────────────────────────────────────
+
+const BASE_URL = process.env.APP_URL
+  ? process.env.APP_URL.replace(/\/$/, '')
+  : 'http://127.0.0.1:3000'
+
+const REDIRECT_URI = BASE_URL + '/callback'
 
 const oauthStates = new Set()
 
 app.get('/auth/login', (req, res) => {
   const { SPOTIFY_CLIENT_ID } = process.env
-  const state = crypto.randomBytes(16).toString('hex')
+  const roomCode = (req.query.room || 'LOCAL').toUpperCase()
+  const randomPart = crypto.randomBytes(16).toString('hex')
+  const state = roomCode + '.' + randomPart
   oauthStates.add(state)
   const scopes = 'streaming user-read-email user-read-private user-read-playback-state user-read-currently-playing user-modify-playback-state playlist-read-private playlist-read-collaborative'
   res.redirect('https://accounts.spotify.com/authorize?' + new URLSearchParams({
     response_type: 'code',
     client_id:     SPOTIFY_CLIENT_ID,
     scope:         scopes,
-    redirect_uri:  'http://127.0.0.1:3000/callback',
+    redirect_uri:  REDIRECT_URI,
     state,
   }))
 })
 
 app.get('/callback', async (req, res) => {
   const { code, state, error } = req.query
-  const FRONTEND = 'http://localhost:3000'
+  const FRONTEND = BASE_URL === 'http://127.0.0.1:3000' ? 'http://localhost:3000' : BASE_URL
+
   if (error || !oauthStates.has(state)) return res.redirect(`${FRONTEND}/host?auth_error=1`)
   oauthStates.delete(state)
+
+  const roomCode = state.split('.')[0]
 
   const { SPOTIFY_CLIENT_ID, SPOTIFY_CLIENT_SECRET } = process.env
   const creds = Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString('base64')
@@ -60,13 +172,15 @@ app.get('/callback', async (req, res) => {
   const tokenRes = await fetch('https://accounts.spotify.com/api/token', {
     method: 'POST',
     headers: { Authorization: `Basic ${creds}`, 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: 'http://127.0.0.1:3000/callback' }),
+    body: new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI }),
   })
   const data = await tokenRes.json()
-  if (!data.access_token) return res.redirect(`${FRONTEND}/host?auth_error=1`)
+  if (!data.access_token) return res.redirect(`${FRONTEND}/host?room=${roomCode}&auth_error=1`)
 
   const expiry = Date.now() + data.expires_in * 1000
-  res.redirect(`${FRONTEND}/host?sp_token=${data.access_token}&sp_expiry=${expiry}&sp_refresh=${data.refresh_token}`)
+  res.redirect(
+    `${FRONTEND}/host?room=${roomCode}&sp_token=${data.access_token}&sp_expiry=${expiry}&sp_refresh=${data.refresh_token}`
+  )
 })
 
 app.get('/auth/refresh', async (req, res) => {
@@ -86,14 +200,7 @@ app.get('/auth/refresh', async (req, res) => {
   })
 })
 
-app.get('/api/server-info', (req, res) => {
-  const ip = getLocalIP()
-  const serverPort = Number(process.env.PORT) || 3000
-  const PORT = serverPort === 3001 ? 3000 : serverPort
-  res.json({ ip, port: PORT, url: `http://${ip}:${PORT}` })
-})
-
-// ── SPOTIFY (server-side client credentials for preview URLs) ──────────────
+// ── SPOTIFY CLIENT-CREDENTIALS (preview URLs) ──────────────────────────────
 
 let spotifyToken = null
 let tokenExpiry  = 0
@@ -166,232 +273,190 @@ app.get('/api/random-track', async (req, res) => {
   }
 })
 
-// ── GAME STATE ─────────────────────────────────────────────────────────────
+// ── WEBSOCKET ──────────────────────────────────────────────────────────────
 
-let gameState = {
-  winner: null, winnerColor: null, winnerId: null,
-  locked: false, players: {}, currentTrack: null, buzzOrder: [],
-  scores: {}, awaitingChoice: false,
-  totalRounds: 0, currentRound: 0, gameOver: false,
-}
+wss.on('connection', (ws, req) => {
+  const url = new URL(req.url, 'ws://localhost')
+  ws.roomCode = (url.searchParams.get('room') || 'LOCAL').toUpperCase()
 
-const PLAYER_COLORS = [
-  { bg: '#FF6B6B' }, { bg: '#4ECDC4' }, { bg: '#FFE66D' }, { bg: '#A8E6CF' },
-  { bg: '#C9B1FF' }, { bg: '#FF9F43' }, { bg: '#74B9FF' }, { bg: '#FD79A8' },
-]
-let colorIndex = 0
+  const room = getOrCreateRoom(ws.roomCode)
+  room.clients.add(ws)
 
-// token → playerId (persists through disconnects within a session)
-const tokenMap = {}
-// playerId → { name, color, token } (persists through disconnects)
-const playerData = {}
-
-function broadcast(data) {
-  const msg = JSON.stringify(data)
-  wss.clients.forEach(client => { if (client.readyState === 1) client.send(msg) })
-}
-
-function broadcastState() {
-  broadcast({
-    type:         'state',
-    winner:       gameState.winner,
-    winnerId:     gameState.winnerId,
-    winnerColor:  gameState.winnerColor,
-    locked:       gameState.locked,
-    players:      Object.values(gameState.players).map(p => ({ id: p.id, name: p.name, color: p.color })),
-    currentTrack:   gameState.currentTrack,
-    buzzOrder:      gameState.buzzOrder,
-    scores:         gameState.scores,
-    awaitingChoice: gameState.awaitingChoice,
-    totalRounds:    gameState.totalRounds,
-    currentRound:   gameState.currentRound,
-    gameOver:       gameState.gameOver,
-  })
-}
-
-function endRound() {
-  if (gameState.totalRounds > 0 && gameState.currentRound >= gameState.totalRounds) {
-    gameState.gameOver = true
-    broadcast({ type: 'game_over' })
-    broadcastState()
-    return
-  }
-  broadcast({ type: 'round_reset' })
-}
-
-wss.on('connection', (ws) => {
   let playerId = null
 
   ws.on('message', (raw) => {
     let msg
     try { msg = JSON.parse(raw) } catch { return }
 
+    const room = rooms.get(ws.roomCode)
+    if (!room) return
+    const gs = room.gameState
+
     if (msg.type === 'join') {
       const { name, token } = msg
 
-      // Reconnect via token if the player was previously registered
-      if (token && tokenMap[token] && playerData[tokenMap[token]]) {
-        const existingId = tokenMap[token]
-        const saved = playerData[existingId]
+      if (token && room.tokenMap[token] && room.playerData[room.tokenMap[token]]) {
+        const existingId = room.tokenMap[token]
+        const saved = room.playerData[existingId]
         playerId = existingId
-        gameState.players[playerId] = { id: playerId, name: saved.name, color: saved.color, ws }
+        gs.players[playerId] = { id: playerId, name: saved.name, color: saved.color, ws }
         ws.send(JSON.stringify({ type: 'joined', id: playerId, color: saved.color }))
-        broadcastState()
+        broadcastStateToRoom(ws.roomCode)
         return
       }
 
       playerId = Date.now() + Math.random().toString(36).slice(2)
-      const color = PLAYER_COLORS[colorIndex % PLAYER_COLORS.length]
-      colorIndex++
+      const color = PLAYER_COLORS[room.colorIndex % PLAYER_COLORS.length]
+      room.colorIndex++
       const playerName = name || 'Jugador'
-      playerData[playerId] = { name: playerName, color: color.bg, token: token || null }
-      gameState.players[playerId] = { id: playerId, name: playerName, color: color.bg, ws }
-      if (token) tokenMap[token] = playerId
+      room.playerData[playerId] = { name: playerName, color: color.bg, token: token || null }
+      gs.players[playerId] = { id: playerId, name: playerName, color: color.bg, ws }
+      if (token) room.tokenMap[token] = playerId
       ws.send(JSON.stringify({ type: 'joined', id: playerId, color: color.bg }))
-      broadcastState()
+      broadcastStateToRoom(ws.roomCode)
     }
 
     if (msg.type === 'buzz' && playerId) {
-      const player = gameState.players[playerId]
+      const player = gs.players[playerId]
       if (!player) return
-      const alreadyBuzzed = gameState.buzzOrder.some(b => b.id === playerId)
+      const alreadyBuzzed = gs.buzzOrder.some(b => b.id === playerId)
       if (!alreadyBuzzed) {
-        gameState.awaitingChoice = false
-        gameState.buzzOrder.push({ id: player.id, name: player.name, color: player.color })
-        if (!gameState.locked) {
-          gameState.locked = true
-          gameState.winner = player.name
-          gameState.winnerId = player.id
-          gameState.winnerColor = player.color
+        gs.awaitingChoice = false
+        gs.buzzOrder.push({ id: player.id, name: player.name, color: player.color })
+        if (!gs.locked) {
+          gs.locked = true
+          gs.winner = player.name
+          gs.winnerId = player.id
+          gs.winnerColor = player.color
         }
-        broadcastState()
+        broadcastStateToRoom(ws.roomCode)
       }
     }
 
     if (msg.type === 'reset') {
-      if (gameState.winnerId) {
-        gameState.scores[gameState.winnerId] = (gameState.scores[gameState.winnerId] || 0) + 1
-      }
-      gameState.locked = false
-      gameState.winner = null
-      gameState.winnerId = null
-      gameState.winnerColor = null
-      gameState.buzzOrder = []
-      gameState.awaitingChoice = false
-      endRound()
-      broadcastState()
+      if (gs.winnerId) gs.scores[gs.winnerId] = (gs.scores[gs.winnerId] || 0) + 1
+      gs.locked = false
+      gs.winner = null
+      gs.winnerId = null
+      gs.winnerColor = null
+      gs.buzzOrder = []
+      gs.awaitingChoice = false
+      endRound(ws.roomCode)
+      broadcastStateToRoom(ws.roomCode)
     }
 
     if (msg.type === 'play_track' && msg.track) {
-      gameState.currentTrack = msg.track
-      if (gameState.totalRounds > 0 && !gameState.gameOver) {
-        gameState.currentRound = gameState.currentRound === 0 ? 1 : gameState.currentRound + 1
+      gs.currentTrack = msg.track
+      if (gs.totalRounds > 0 && !gs.gameOver) {
+        gs.currentRound = gs.currentRound === 0 ? 1 : gs.currentRound + 1
       }
-      broadcastState()
+      broadcastStateToRoom(ws.roomCode)
     }
 
     if (msg.type === 'clear_track') {
-      gameState.currentTrack = null
-      broadcastState()
+      gs.currentTrack = null
+      broadcastStateToRoom(ws.roomCode)
     }
 
     if (msg.type === 'reveal_track') {
-      broadcast({ type: 'reveal_track' })
+      broadcastToRoom(ws.roomCode, { type: 'reveal_track' })
     }
 
     if (msg.type === 'partial_reset') {
-      gameState.locked = false
-      gameState.winner = null
-      gameState.winnerId = null
-      gameState.winnerColor = null
-      broadcastState()
+      gs.locked = false
+      gs.winner = null
+      gs.winnerId = null
+      gs.winnerColor = null
+      broadcastStateToRoom(ws.roomCode)
     }
 
     if (msg.type === 'surrender') {
-      if (!gameState.winner) return
-      if (gameState.winnerId) {
-        gameState.scores[gameState.winnerId] = (gameState.scores[gameState.winnerId] || 0) - 1
-      }
-      const nextPlayer = gameState.buzzOrder[1]
+      if (!gs.winner) return
+      if (gs.winnerId) gs.scores[gs.winnerId] = (gs.scores[gs.winnerId] || 0) - 1
+      const nextPlayer = gs.buzzOrder[1]
       if (nextPlayer) {
-        gameState.buzzOrder.shift()
-        gameState.winner = nextPlayer.name
-        gameState.winnerId = nextPlayer.id
-        gameState.winnerColor = nextPlayer.color
-        gameState.locked = true
+        gs.buzzOrder.shift()
+        gs.winner = nextPlayer.name
+        gs.winnerId = nextPlayer.id
+        gs.winnerColor = nextPlayer.color
+        gs.locked = true
       } else {
-        const nonBuzzed = Object.keys(gameState.players).length - gameState.buzzOrder.length
-        gameState.locked = false
-        gameState.winner = null
-        gameState.winnerId = null
-        gameState.winnerColor = null
+        const nonBuzzed = Object.keys(gs.players).length - gs.buzzOrder.length
+        gs.locked = false
+        gs.winner = null
+        gs.winnerId = null
+        gs.winnerColor = null
         if (nonBuzzed === 0) {
-          gameState.buzzOrder = []
-          gameState.awaitingChoice = false
-          endRound()
+          gs.buzzOrder = []
+          gs.awaitingChoice = false
+          endRound(ws.roomCode)
         } else {
-          gameState.awaitingChoice = true
+          gs.awaitingChoice = true
         }
       }
-      broadcastState()
+      broadcastStateToRoom(ws.roomCode)
     }
 
     if (msg.type === 'skip') {
-      gameState.locked = false
-      gameState.winner = null
-      gameState.winnerId = null
-      gameState.winnerColor = null
-      gameState.buzzOrder = []
-      gameState.awaitingChoice = false
-      endRound()
-      broadcastState()
+      gs.locked = false
+      gs.winner = null
+      gs.winnerId = null
+      gs.winnerColor = null
+      gs.buzzOrder = []
+      gs.awaitingChoice = false
+      endRound(ws.roomCode)
+      broadcastStateToRoom(ws.roomCode)
     }
 
     if (msg.type === 'set_rounds') {
-      gameState.totalRounds = Math.max(1, Math.min(20, Number(msg.count) || 1))
-      gameState.currentRound = 0
-      gameState.gameOver = false
-      broadcastState()
+      gs.totalRounds = Math.max(1, Math.min(20, Number(msg.count) || 1))
+      gs.currentRound = 0
+      gs.gameOver = false
+      broadcastStateToRoom(ws.roomCode)
     }
 
     if (msg.type === 'replay_request') {
-      gameState.awaitingChoice = false
-      gameState.locked = false
-      gameState.winner = null
-      gameState.winnerId = null
-      gameState.winnerColor = null
-      broadcast({ type: 'round_replay' })
-      broadcastState()
+      gs.awaitingChoice = false
+      gs.locked = false
+      gs.winner = null
+      gs.winnerId = null
+      gs.winnerColor = null
+      broadcastToRoom(ws.roomCode, { type: 'round_replay' })
+      broadcastStateToRoom(ws.roomCode)
     }
 
     if (msg.type === 'game_reset') {
-      gameState.locked = false
-      gameState.winner = null
-      gameState.winnerId = null
-      gameState.winnerColor = null
-      gameState.buzzOrder = []
-      broadcastState()
+      gs.locked = false
+      gs.winner = null
+      gs.winnerId = null
+      gs.winnerColor = null
+      gs.buzzOrder = []
+      broadcastStateToRoom(ws.roomCode)
     }
 
     if (msg.type === 'full_reset') {
-      broadcast({ type: 'full_reset' })
-      gameState = { winner: null, winnerId: null, winnerColor: null, locked: false, players: {}, currentTrack: null, buzzOrder: [], scores: {}, awaitingChoice: false, totalRounds: 0, currentRound: 0, gameOver: false }
-      colorIndex = 0
-      for (const k of Object.keys(tokenMap)) delete tokenMap[k]
-      for (const k of Object.keys(playerData)) delete playerData[k]
-      broadcastState()
+      broadcastToRoom(ws.roomCode, { type: 'full_reset' })
+      room.gameState = makeGameState()
+      room.colorIndex = 0
+      for (const k of Object.keys(room.tokenMap)) delete room.tokenMap[k]
+      for (const k of Object.keys(room.playerData)) delete room.playerData[k]
+      broadcastStateToRoom(ws.roomCode)
     }
   })
 
   ws.on('close', () => {
-    if (playerId && gameState.players[playerId]) {
-      delete gameState.players[playerId]
-      broadcastState()
+    const room = rooms.get(ws.roomCode)
+    if (!room) return
+    room.clients.delete(ws)
+    if (playerId && room.gameState.players[playerId]) {
+      delete room.gameState.players[playerId]
+      broadcastStateToRoom(ws.roomCode)
     }
   })
 })
 
-// Serve built frontend (production). Registered last so API routes take priority.
+// ── SERVE FRONTEND ─────────────────────────────────────────────────────────
+
 if (existsSync(distDir)) {
   app.use(express.static(distDir))
   app.use((req, res) => {

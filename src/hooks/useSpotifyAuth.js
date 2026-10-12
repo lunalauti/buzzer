@@ -58,7 +58,11 @@ export function useSpotifyAuth() {
     return tokenRef.current
   }, [setMode])
 
-  const login = useCallback(() => { location.href = '/auth/login' }, [])
+  // Reads roomCode from URL automatically so callers don't need to pass it
+  const login = useCallback(() => {
+    const roomCode = new URLSearchParams(location.search).get('room') || 'LOCAL'
+    location.href = '/auth/login?room=' + roomCode
+  }, [])
 
   return { spFetch, clearAuth, init, login, tokenRef }
 }

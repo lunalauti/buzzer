@@ -11,7 +11,8 @@ export function WebSocketProvider({ children }) {
 
   const connect = useCallback(() => {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws'
-    const socket = new WebSocket(`${proto}://${location.host}/ws`)
+    const roomCode = new URLSearchParams(location.search).get('room') || 'LOCAL'
+    const socket = new WebSocket(`${proto}://${location.host}/ws?room=${roomCode}`)
     ws.current = socket
 
     socket.onopen = () => setConnected(true)

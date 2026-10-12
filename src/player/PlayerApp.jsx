@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react'
 import { useGameStore } from '../store/gameStore'
 import { useWs } from '../contexts/WebSocketContext'
 import JoinScreen from './JoinScreen'
@@ -7,6 +8,9 @@ import PositionOverlay from './PositionOverlay'
 import ChoiceOverlay from './ChoiceOverlay'
 import GameOverScreen from './GameOverScreen'
 import ConnDot from '../components/ConnDot'
+import WakeUpLoader from '../components/WakeUpLoader'
+
+const ROOM_CODE = new URLSearchParams(location.search).get('room')
 
 export default function PlayerApp() {
   const myId = useGameStore(s => s.myId)
@@ -25,10 +29,43 @@ export default function PlayerApp() {
   const currentRound = useGameStore(s => s.currentRound)
   const { connected } = useWs()
 
+  // Show wake-up loader if not connected after 1s (covers Render cold-start)
+  const [showLoader, setShowLoader] = useState(false)
+  useEffect(() => {
+    if (connected) { setShowLoader(false); return }
+    const t = setTimeout(() => setShowLoader(true), 1000)
+    return () => clearTimeout(t)
+  }, [connected])
+
   const hasBuzzed = !!myId && buzzOrder.some(b => b.id === myId)
   const myPosition = hasBuzzed ? buzzOrder.findIndex(b => b.id === myId) + 1 : null
   const isWinner = !!winner && winnerId === myId
   const isLocked = locked && !!winner
+
+  // No room code: player landed on / without a link from the host
+  if (!ROOM_CODE) {
+    return (
+      <div style={{
+        minHeight: '100dvh', background: '#0d0d0f', display: 'flex',
+        flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        gap: 20, padding: '0 24px', textAlign: 'center',
+      }}>
+        <div style={{ fontFamily: "'Black Han Sans', sans-serif", fontSize: 48, color: '#f0e040' }}>
+          BUZZ!
+        </div>
+        <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 18, color: 'rgba(255,255,255,0.7)', margin: 0 }}>
+          Pedile el link al host para unirte a la sala.
+        </p>
+        <p style={{ fontFamily: "'Nunito', sans-serif", fontSize: 14, color: 'rgba(255,255,255,0.35)', margin: 0 }}>
+          El link incluye el código de sala automáticamente.
+        </p>
+      </div>
+    )
+  }
+
+  if (showLoader && !connected) {
+    return <WakeUpLoader />
+  }
 
   if (gameOver && myId) {
     return <GameOverScreen players={players} scores={scores} myId={myId} />

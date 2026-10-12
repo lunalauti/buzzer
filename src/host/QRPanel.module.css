@@ -51,3 +51,16 @@
 }
 .copyBtn:hover { background: var(--accent); color: #0d0d0f; }
 .copyBtn.copied { background: #4ade80; border-color: #4ade80; color: #0d0d0f; }
+
+.roomCode {
+  font-family: 'Nunito', sans-serif;
+  font-size: 13px;
+  color: var(--muted);
+  text-align: center;
+}
+.roomCode strong {
+  color: var(--accent);
+  font-family: 'Black Han Sans', sans-serif;
+  font-size: 15px;
+  letter-spacing: 3px;
+}
