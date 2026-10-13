@@ -51,7 +51,14 @@ export default function SetupModal({ onConfirm, onLogin }) {
           <div className={styles.spotifyRow}>{spotifyEl}</div>
         </div>
 
-        <button className={styles.comenzarBtn} onClick={() => onConfirm(rounds)}>
+        <button
+          className={styles.comenzarBtn}
+          disabled={spotifyMode === 'login' || spotifyMode === 'init'}
+          onClick={() => {
+            window.open('https://open.spotify.com/', '_blank')
+            onConfirm(rounds)
+          }}
+        >
           COMENZAR
         </button>
       </div>

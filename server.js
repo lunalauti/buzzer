@@ -125,6 +125,10 @@ app.post('/api/rooms', (req, res) => {
 })
 
 app.get('/api/server-info', (req, res) => {
+  if (process.env.APP_URL) {
+    const url = process.env.APP_URL.replace(/\/$/, '')
+    return res.json({ ip: null, port: null, url })
+  }
   const ip = getLocalIP()
   const serverPort = Number(process.env.PORT) || 3000
   const PORT = serverPort === 3001 ? 3000 : serverPort
