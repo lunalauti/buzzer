@@ -43,6 +43,7 @@ export default function HostApp() {
   const {
     progressBarRef,
     loadDevices,
+    refreshDevices,
     playRandom,
     replayTrack,
     stopPlayback,
@@ -132,7 +133,10 @@ export default function HostApp() {
 
   const handleSetupConfirm = (rounds) => {
     localStorage.removeItem('buzzer_setup_rounds')
+    window.open('https://open.spotify.com/', '_blank')
+    window.focus()
     send('set_rounds', { count: rounds })
+    setTimeout(refreshDevices, 3000)
   }
 
   return (

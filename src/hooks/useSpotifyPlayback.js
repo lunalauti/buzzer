@@ -53,6 +53,18 @@ export function useSpotifyPlayback({ spFetch, clearAuth, send }) {
     setMode('ready')
   }, [spFetch, clearAuth, setMode, setDevices, setDeviceId])
 
+  const refreshDevices = useCallback(async () => {
+    const res = await spFetch('https://api.spotify.com/v1/me/player/devices').catch(() => null)
+    if (!res || !res.ok) return
+    const data = await res.json()
+    const devs = data.devices || []
+    if (devs.length === 0) return
+    setDevices(devs)
+    const webPlayer = devs.find(d => /web player/i.test(d.name))
+    const preferred = webPlayer || devs.find(d => d.is_active) || devs[0]
+    setDeviceId(preferred.id)
+  }, [spFetch, setDevices, setDeviceId])
+
   const extractPlaylistId = useCallback((val) => {
     val = (val || '').trim()
     const m = val.match(/playlist[/:]([A-Za-z0-9]+)/)
@@ -256,6 +268,7 @@ export function useSpotifyPlayback({ spFetch, clearAuth, send }) {
   return {
     progressBarRef,
     loadDevices,
+    refreshDevices,
     playRandom,
     replayTrack,
     stopPlayback,
