@@ -165,8 +165,10 @@ app.get('/callback', async (req, res) => {
   const { code, state, error } = req.query
   const FRONTEND = BASE_URL === 'http://127.0.0.1:3000' ? 'http://localhost:3000' : BASE_URL
 
-  if (error || !oauthStates.has(state)) return res.redirect(`${FRONTEND}/host?auth_error=1`)
-  oauthStates.delete(state)
+  // Accept state if it matches expected format (roomCode.hex) — allows server restarts
+  const stateValid = state && /^[A-Z0-9]{4,8}\.[0-9a-f]{32}$/.test(state)
+  if (error || !stateValid) return res.redirect(`${FRONTEND}/host?auth_error=1`)
+  oauthStates.delete(state) // no-op if already gone (server restart)
 
   const roomCode = state.split('.')[0]
 

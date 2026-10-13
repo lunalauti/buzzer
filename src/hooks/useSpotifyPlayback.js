@@ -43,7 +43,8 @@ export function useSpotifyPlayback({ spFetch, clearAuth, send }) {
   const loadDevices = useCallback(async () => {
     setMode('sdk_loading')
     const res = await spFetch('https://api.spotify.com/v1/me/player/devices')
-    if (!res.ok) { clearAuth(); setMode('login'); return }
+    if (res.status === 401) { clearAuth(); setMode('login'); return }
+    if (!res.ok) { setMode('no_device'); return } // 403 = Premium required; don't clear valid token
     const data = await res.json()
     const devs = data.devices || []
     if (devs.length === 0) { setMode('no_device'); return }
